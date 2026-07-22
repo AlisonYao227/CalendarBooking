@@ -461,16 +461,19 @@ app.get('/api/logs', async (req, res) => {
 // ================================================================
 //  All other routes → serve index.html (SPA fallback)
 // ================================================================
-app.get('*', (req, res) => {
+app.get('/{*splat}', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ========== 啟動 ==========
 initDB().then(() => {
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
         console.log(`🚀 伺服器啟動：http://localhost:${PORT}`);
     });
 }).catch(err => {
     console.error('❌ 資料庫初始化失敗:', err.message);
-    process.exit(1);
+    console.error('嘗試仍啟動伺服器（部分功能可能無法使用）...');
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`⚠️ 伺服器啟動（無 DB）：http://localhost:${PORT}`);
+    });
 });

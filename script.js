@@ -1,5 +1,5 @@
 // --- 元素選取與初始化保持不變 ---
-const API_BASE = "http://localhost:3000/api";
+const API_BASE = "https://thriving-imagination-production-8d1a.up.railway.app/api";
 async function createReservation(data) {
   const res = await fetch(`${API_BASE}/reservations`, {
     method: "POST",

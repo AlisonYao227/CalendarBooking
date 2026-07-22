@@ -10,7 +10,8 @@ const PORT = process.env.PORT || 3000;
 // PostgreSQL connection
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+    connectionTimeoutMillis: 5000
 });
 
 app.use(cors());
@@ -471,14 +472,11 @@ app.get('/{*splat}', (req, res) => {
 });
 
 // ========== 啟動 ==========
-initDB().then(() => {
-    app.listen(PORT, '0.0.0.0', () => {
-        console.log(`🚀 伺服器啟動：http://localhost:${PORT}`);
-    });
-}).catch(err => {
-    console.error('❌ 資料庫初始化失敗:', err.message);
-    console.error('嘗試仍啟動伺服器（部分功能可能無法使用）...');
-    app.listen(PORT, '0.0.0.0', () => {
-        console.log(`⚠️ 伺服器啟動（無 DB）：http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 伺服器啟動：http://localhost:${PORT}`);
+    initDB().then(() => {
+        console.log('✅ 資料庫就緒');
+    }).catch(err => {
+        console.error('❌ 資料庫初始化失敗:', err.message);
     });
 });

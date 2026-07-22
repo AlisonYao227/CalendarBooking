@@ -488,7 +488,7 @@ process.on('unhandledRejection', (err) => {
     console.error('⚠️ unhandledRejection:', err?.message || err);
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, () => {
     console.log(`🚀 伺服器啟動：http://localhost:${PORT}`);
     initDB().then(() => {
         console.log('✅ 資料庫就緒');

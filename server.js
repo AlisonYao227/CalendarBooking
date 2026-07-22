@@ -289,7 +289,7 @@ app.get('*', (req, res) => {
 process.on('uncaughtException', (err) => { console.error('⚠️ uncaughtException:', err.message); });
 process.on('unhandledRejection', (err) => { console.error('⚠️ unhandledRejection:', err?.message || err); });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on port ${PORT}`);
     initDB().catch(err => console.error('❌ DB init failed:', err.message));
 });

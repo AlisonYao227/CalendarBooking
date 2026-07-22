@@ -2,12 +2,9 @@
   "name": "calendar-booking",
   "version": "1.0.0",
   "description": "Calendar Booking System",
-  "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server.js"
   },
-  "type": "commonjs",
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",

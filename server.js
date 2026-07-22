@@ -114,6 +114,11 @@ async function initDB() {
     console.log('✅ 資料表初始化完成');
 }
 
+// ========== API 根路由 ==========
+app.get('/api', (req, res) => {
+    res.json({ ok: true, message: "Calendar Booking API is running" });
+});
+
 // ========== 登入 API ==========
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;

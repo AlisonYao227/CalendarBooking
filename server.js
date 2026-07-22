@@ -14,6 +14,10 @@ const pool = new Pool({
     connectionTimeoutMillis: 5000
 });
 
+pool.on('error', (err) => {
+    console.error('⚠️ PostgreSQL idle client error:', err.message);
+});
+
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -472,6 +476,13 @@ app.get('*', (req, res) => {
 });
 
 // ========== 啟動 ==========
+process.on('uncaughtException', (err) => {
+    console.error('⚠️ uncaughtException:', err.message);
+});
+process.on('unhandledRejection', (err) => {
+    console.error('⚠️ unhandledRejection:', err?.message || err);
+});
+
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 伺服器啟動：http://localhost:${PORT}`);
     initDB().then(() => {

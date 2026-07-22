@@ -467,7 +467,7 @@ app.get('/api/logs', async (req, res) => {
 // ================================================================
 //  All other routes → serve index.html (SPA fallback)
 // ================================================================
-app.get('/{*splat}', (req, res) => {
+app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 

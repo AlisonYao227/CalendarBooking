@@ -422,12 +422,24 @@ function getFilteredData() {
                 const data = new Uint8Array(evt.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                const rawData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
                 
-                if (jsonData.length === 0) {
+                if (rawData.length === 0) {
                     alert("Excel 內沒有任何資料");
                     return;
                 }
+                
+                const headerRow = rawData[0];
+                const headerMap = {};
+                headerRow.forEach((h, i) => {
+                    const key = String(h || '').trim();
+                    if (key === '日期' || key === 'date') headerMap.date = i;
+                    else if (key === '活動名稱' || key === '名稱' || key === 'name') headerMap.name = i;
+                    else if (key === '預約員工' || key === '預約人' || key === 'employee') headerMap.employee = i;
+                    else if (key === '房間' || key === 'room') headerMap.room = i;
+                    else if (key === '開始時間' || key === 'startTime' || key === 'start') headerMap.startTime = i;
+                    else if (key === '結束時間' || key === 'endTime' || key === 'end') headerMap.endTime = i;
+                });
                 
                 let successCount = 0;
                 let skipCount = 0;
@@ -436,21 +448,25 @@ function getFilteredData() {
                 const skipList = [];
                 const importList = [];
                 
-                // 先收集需要自動新增的房間和員工
                 const newRooms = new Set();
                 const newEmps = new Set();
                 
-                jsonData.forEach((row, idx) => {
-                    const dateRaw = row['日期'] || row['date'] || row.Date;
-                    const name = row['活動名稱'] || row['名稱'] || row['name'] || row.Name;
-                    const employee = row['預約員工'] || row['預約人'] || row['employee'] || row.Employee;
-                    const room = row['房間'] || row['room'] || row.Room;
-                    const startRaw = row['開始時間'] || row['startTime'] || row['start'] || row.Start;
-                    const endRaw = row['結束時間'] || row['endTime'] || row['end'] || row.End;
+                const dataRows = rawData.slice(1).filter(r => r.some(c => c !== null && c !== undefined && String(c).trim() !== ''));
+                
+                dataRows.forEach((row, dataIdx) => {
+                    const excelRow = dataIdx + 2;
+                    const get = (key) => headerMap[key] !== undefined ? row[headerMap[key]] : undefined;
+                    
+                    const dateRaw = get('date');
+                    const name = get('name');
+                    const employee = get('employee');
+                    const room = get('room');
+                    const startRaw = get('startTime');
+                    const endRaw = get('endTime');
                     
                     if (dateRaw === undefined || !name || !employee || !room || startRaw === undefined || endRaw === undefined) {
                         skipCount++;
-                        skipList.push(`第${idx+2}行：欄位不全`);
+                        skipList.push(`第${excelRow}行：欄位不全`);
                         return;
                     }
                     
@@ -460,37 +476,34 @@ function getFilteredData() {
                     
                     if (sTime >= eTime) {
                         skipCount++;
-                        skipList.push(`第${idx+2}行「${name}」：結束時間需晚於開始時間`);
+                        skipList.push(`第${excelRow}行「${name}」：結束時間需晚於開始時間`);
                         return;
                     }
                     if (eTime > "23:30") {
                         skipCount++;
-                        skipList.push(`第${idx+2}行「${name}」：結束時間不可超過23:30`);
+                        skipList.push(`第${excelRow}行「${name}」：結束時間不可超過23:30`);
                         return;
                     }
                     
                     const roomName = String(room).trim();
                     const empName = String(employee).trim();
                     
-                    // 自動新增房間（尚未在後端）
                     if (!roomList.some(item => item.name === roomName) && !newRooms.has(roomName)) {
                         newRooms.add(roomName);
                         newRoomCount++;
                     }
                     
-                    // 自動新增員工（尚未在後端）
                     if (!empList.some(e => e.name === empName) && !newEmps.has(empName)) {
                         newEmps.add(empName);
                         newEmpCount++;
                     }
                     
-                    // 衝突檢測
                     const isConflict = eventsData.some(ev => {
                         return ev.date === dateStr && ev.room === roomName && sTime < ev.endTime && eTime > ev.startTime;
                     });
                     if (isConflict) {
                         skipCount++;
-                        skipList.push(`第${idx+2}行「${name}」：${dateStr} ${roomName} 時段衝突`);
+                        skipList.push(`第${excelRow}行「${name}」：${dateStr} ${roomName} 時段衝突`);
                         return;
                     }
                     

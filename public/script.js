@@ -451,10 +451,14 @@ function getFilteredData() {
                 const newRooms = new Set();
                 const newEmps = new Set();
                 
-                const dataRows = rawData.slice(1).filter(r => r.some(c => c !== null && c !== undefined && String(c).trim() !== ''));
+                const dataRows = rawData.slice(1);
                 
-                dataRows.forEach((row, dataIdx) => {
-                    const excelRow = dataIdx + 2;
+                dataRows.forEach((row, rawIdx) => {
+                    const excelRow = rawIdx + 2;
+                    
+                    const isEmpty = !row || row.every(c => c === null || c === undefined || String(c).trim() === '');
+                    if (isEmpty) return;
+                    
                     const get = (key) => headerMap[key] !== undefined ? row[headerMap[key]] : undefined;
                     
                     const dateRaw = get('date');

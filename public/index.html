@@ -156,6 +156,10 @@
     <button id="settingBtn" class="setting-btn" title="系統設定">
         <i class="fa-solid fa-gear"></i>
     </button>
+    <!-- 本月代辦事項按鈕 -->
+    <button id="todosBtn" class="setting-btn" title="代辦事項">
+        <i class="fa-solid fa-calendar-check"></i>
+    </button>
   </div>
   <!-- ✅ 新增公告橫條，放在粉紅header內部！ -->
   <div class="announcement-bar">
@@ -399,6 +403,49 @@
     </div>
   </div>
 </div>
+
+  <!-- 代辦事項彈窗 -->
+  <div class="modal-overlay" id="todosModal">
+    <div class="add-event-wrapper" style="width:560px;max-width:90vw;">
+      <div class="modal-header">
+        <h3>代辦事項</h3>
+        <div class="header-right">
+          <button class="btn-close-view"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+      <div class="add-event-body">
+        <div class="input-group">
+          <label>代辦事項名稱</label>
+          <input type="text" id="todoTitle" placeholder="例如：設備巡檢">
+        </div>
+        <div class="input-row">
+          <div class="input-group">
+            <label>開始日期</label>
+            <input type="date" id="todoStartDate">
+          </div>
+          <div class="input-group">
+            <label>結束日期</label>
+            <input type="date" id="todoEndDate">
+          </div>
+        </div>
+        <div class="input-row">
+          <div class="input-group">
+            <label>房間</label>
+            <select id="todoRoom"><option value="">不指定</option></select>
+          </div>
+          <div class="input-group">
+            <label>負責人</label>
+            <select id="todoEmployee"><option value="">不指定</option></select>
+          </div>
+        </div>
+        <div class="input-group">
+          <label style="cursor:pointer;"><input type="checkbox" id="todoAllDay" style="margin-right:6px;"> 全日</label>
+        </div>
+        <button id="addTodoBtn" class="btn-add-main" style="width:100%;margin-bottom:12px;">新增代辦事項</button>
+        <div id="todoListWrap" style="max-height:300px;overflow-y:auto;"></div>
+      </div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>

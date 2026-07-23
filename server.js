@@ -56,6 +56,7 @@ async function initDB() {
         end_time TEXT NOT NULL, creator_id INTEGER, is_deleted INTEGER DEFAULT 0,
         create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, update_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
+    await query(`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS end_date TEXT;`);
     await query(`CREATE TABLE IF NOT EXISTS employees (
         id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
@@ -65,6 +66,17 @@ async function initDB() {
     await query(`CREATE TABLE IF NOT EXISTS operation_logs (
         id SERIAL PRIMARY KEY, operate_type TEXT NOT NULL, target_res_id INTEGER,
         content TEXT, detail TEXT, ip TEXT, create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await query(`CREATE TABLE IF NOT EXISTS todos (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        room_name TEXT DEFAULT '',
+        employee TEXT DEFAULT '',
+        is_all_day INTEGER DEFAULT 0,
+        is_deleted INTEGER DEFAULT 0,
+        create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
 
     const adminCheck = await query(`SELECT id FROM users WHERE username = 'admin'`);
@@ -108,10 +120,10 @@ app.post('/api/login', async (req, res) => {
 
 // === Reservations ===
 app.post('/api/reservations', async (req, res) => {
-    const { date, name, employee, room, startTime, endTime } = req.body;
+    const { date, name, employee, room, startTime, endTime, endDate } = req.body;
     if (!date || !name || !employee || !room || !startTime || !endTime) return res.json({ ok: false, msg: "所有欄位皆為必填" });
     try {
-        const r = await query(`INSERT INTO reservations (res_date,title,employee,room_name,start_time,end_time) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`, [date, name, employee, room, startTime, endTime]);
+        const r = await query(`INSERT INTO reservations (res_date,title,employee,room_name,start_time,end_time,end_date) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`, [date, name, employee, room, startTime, endTime, endDate || date]);
         const id = r.rows[0].id;
         await logOp('CREATE_RESERVATION', id, `新增: ${date} ${startTime}-${endTime} ${name} [${employee}] ${room}`, req.ip, { date, name, employee, room, startTime, endTime });
         res.json({ ok: true, data: { id } });
@@ -120,18 +132,18 @@ app.post('/api/reservations', async (req, res) => {
 
 app.get('/api/reservations', async (req, res) => {
     try {
-        const r = await query(`SELECT id, res_date as date, title as name, employee, room_name as room, start_time as "startTime", end_time as "endTime" FROM reservations WHERE is_deleted=0 ORDER BY res_date, start_time`);
+        const r = await query(`SELECT id, res_date as date, title as name, employee, room_name as room, start_time as "startTime", end_time as "endTime", end_date as "endDate" FROM reservations WHERE is_deleted=0 ORDER BY res_date, start_time`);
         res.json({ ok: true, data: r.rows });
     } catch (err) { res.json({ ok: false, msg: err.message }); }
 });
 
 app.put('/api/reservations/:id', async (req, res) => {
     const id = req.params.id;
-    const { date, name, employee, room, startTime, endTime } = req.body;
+    const { date, name, employee, room, startTime, endTime, endDate } = req.body;
     if (!date || !name || !employee || !room || !startTime || !endTime) return res.json({ ok: false, msg: "所有欄位皆為必填" });
     try {
         const old = await query(`SELECT * FROM reservations WHERE id=$1`, [id]);
-        const r = await query(`UPDATE reservations SET res_date=$1,title=$2,employee=$3,room_name=$4,start_time=$5,end_time=$6,update_at=CURRENT_TIMESTAMP WHERE id=$7 AND is_deleted=0 RETURNING id`, [date, name, employee, room, startTime, endTime, id]);
+        const r = await query(`UPDATE reservations SET res_date=$1,title=$2,employee=$3,room_name=$4,start_time=$5,end_time=$6,end_date=$7,update_at=CURRENT_TIMESTAMP WHERE id=$8 AND is_deleted=0 RETURNING id`, [date, name, employee, room, startTime, endTime, endDate || date, id]);
         if (r.rows.length === 0) return res.json({ ok: false, msg: "找不到該預約" });
         const d = old.rows[0] || {};
         await logOp('UPDATE_RESERVATION', id, `更新 #${id}`, req.ip, { before: { date: d.res_date, name: d.title, employee: d.employee, room: d.room_name, startTime: d.start_time, endTime: d.end_time }, after: { date, name, employee, room, startTime, endTime } });
@@ -141,7 +153,7 @@ app.put('/api/reservations/:id', async (req, res) => {
 
 app.delete('/api/reservations/batch/date/:date', async (req, res) => {
     try {
-        const r = await query(`UPDATE reservations SET is_deleted=1,update_at=CURRENT_TIMESTAMP WHERE res_date=$1 AND is_deleted=0`, [req.params.date]);
+        const r = await query(`UPDATE reservations SET is_deleted=1,update_at=CURRENT_TIMESTAMP WHERE (res_date=$1 OR end_date=$1) AND is_deleted=0`, [req.params.date]);
         await logOp('BATCH_DELETE_DATE', null, `批量刪除 ${req.params.date} 的 ${r.rowCount} 筆`, req.ip);
         res.json({ ok: true, deleted: r.rowCount });
     } catch (err) { res.json({ ok: false, msg: err.message }); }
@@ -165,7 +177,7 @@ app.post('/api/reservations/batch', async (req, res) => {
         for (const item of list) {
             try {
                 if (client) {
-                    await client.query(`INSERT INTO reservations (res_date,title,employee,room_name,start_time,end_time) VALUES ($1,$2,$3,$4,$5,$6)`, [item.date, item.name, item.employee, item.room, item.startTime, item.endTime]);
+                    await client.query(`INSERT INTO reservations (res_date,title,employee,room_name,start_time,end_time,end_date) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [item.date, item.name, item.employee, item.room, item.startTime, item.endTime, item.endDate || item.date]);
                 }
                 ok++;
             } catch (e) { fail++; }
@@ -260,6 +272,40 @@ app.get('/api/announcement', async (req, res) => {
 app.post('/api/announcement', async (req, res) => {
     try { await query(`INSERT INTO announcement (id,content) VALUES (1,$1) ON CONFLICT (id) DO UPDATE SET content=$1,update_at=CURRENT_TIMESTAMP`, [req.body.content]); res.json({ ok: true }); }
     catch (err) { res.json({ ok: false, msg: err.message }); }
+});
+
+// === Todos ===
+app.get('/api/todos', async (req, res) => {
+    try {
+        const r = await query(`SELECT id, title, start_date as "startDate", end_date as "endDate", room_name as "room", employee, is_all_day as "isAllDay" FROM todos WHERE is_deleted=0 ORDER BY start_date`);
+        res.json({ ok: true, data: r.rows });
+    } catch (err) { res.json({ ok: false, msg: err.message }); }
+});
+
+app.post('/api/todos', async (req, res) => {
+    const { title, startDate, endDate, room, employee, isAllDay } = req.body;
+    if (!title || !startDate || !endDate) return res.json({ ok: false, msg: "標題、開始日期、結束日期為必填" });
+    try {
+        const r = await query(`INSERT INTO todos (title,start_date,end_date,room_name,employee,is_all_day) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`, [title, startDate, endDate, room||'', employee||'', isAllDay ? 1 : 0]);
+        res.json({ ok: true, data: { id: r.rows[0].id } });
+    } catch (err) { res.json({ ok: false, msg: err.message }); }
+});
+
+app.put('/api/todos/:id', async (req, res) => {
+    const { title, startDate, endDate, room, employee, isAllDay } = req.body;
+    try {
+        const r = await query(`UPDATE todos SET title=$1,start_date=$2,end_date=$3,room_name=$4,employee=$5,is_all_day=$6 WHERE id=$7 AND is_deleted=0 RETURNING id`, [title, startDate, endDate, room||'', employee||'', isAllDay ? 1 : 0, req.params.id]);
+        if (r.rows.length === 0) return res.json({ ok: false, msg: "找不到" });
+        res.json({ ok: true });
+    } catch (err) { res.json({ ok: false, msg: err.message }); }
+});
+
+app.delete('/api/todos/:id', async (req, res) => {
+    try {
+        const r = await query(`UPDATE todos SET is_deleted=1 WHERE id=$1`, [req.params.id]);
+        if (r.rowCount === 0) return res.json({ ok: false, msg: "找不到" });
+        res.json({ ok: true });
+    } catch (err) { res.json({ ok: false, msg: err.message }); }
 });
 
 // === Logs ===

@@ -314,6 +314,8 @@ async function loadAllData() {
         const empJson = await empRes.json();
         if (empJson.ok) empList = empJson.data;
 
+        await loadTodos();
+
         updateView();
         initFilterDropdowns();
     } catch (err) {
@@ -398,7 +400,7 @@ function getFilteredData() {
     importTipBtn.onclick = (e) => {
         e.stopPropagation();
         // 固定前置格式說明，每次點擊都顯示
-        let tipText = "【Excel標準格式規範】\n請按照系統匯出Excel欄位建立表格：\n必填欄位：日期、活動名稱、預約員工、房間、開始時間、結束時間\n時間格式範例：09:00、23:30；不可跨午夜\n\n";
+        let tipText = "【Excel標準格式規範】\n請按照系統匯出Excel欄位建立表格：\n必填欄位：日期、活動名稱、預約員工、房間、開始時間、結束時間\n時間格式範例：09:00、23:30；支援跨日預約（結束時間早於開始時間自動視為隔日結束）\n\n";
 
         if(currentImportSkipList.length > 0){
             // 有異常：規範 + 完整錯誤清單
@@ -439,6 +441,7 @@ function getFilteredData() {
                     else if (key === '房間' || key === 'room') headerMap.room = i;
                     else if (key === '開始時間' || key === 'startTime' || key === 'start') headerMap.startTime = i;
                     else if (key === '結束時間' || key === 'endTime' || key === 'end') headerMap.endTime = i;
+                    else if (key === '結束日期' || key === 'endDate') headerMap.endDate = i;
                 });
                 
                 let successCount = 0;
@@ -478,15 +481,15 @@ function getFilteredData() {
                     const sTime = excelTimeToStr(startRaw);
                     const eTime = excelTimeToStr(endRaw);
                     
-                    if (sTime >= eTime) {
-                        skipCount++;
-                        skipList.push(`第${excelRow}行「${name}」：結束時間需晚於開始時間`);
-                        return;
-                    }
-                    if (eTime > "23:30") {
-                        skipCount++;
-                        skipList.push(`第${excelRow}行「${name}」：結束時間不可超過23:30`);
-                        return;
+                    // Calculate endDate for cross-day support
+                    let importEndDate = dateStr;
+                    if (headerMap.endDate !== undefined) {
+                        const rawEndDate = get('endDate');
+                        if (rawEndDate) importEndDate = excelDateToStr(rawEndDate);
+                    } else if (sTime >= eTime) {
+                        const nextDay = new Date(dateStr);
+                        nextDay.setDate(nextDay.getDate() + 1);
+                        importEndDate = getFormattedDate(nextDay);
                     }
                     
                     const roomName = String(room).trim();
@@ -503,7 +506,12 @@ function getFilteredData() {
                     }
                     
                     const isConflict = eventsData.some(ev => {
-                        return ev.date === dateStr && ev.room === roomName && sTime < ev.endTime && eTime > ev.startTime;
+                        const evEnd = ev.endDate || ev.date;
+                        const newStartDT = dateStr + 'T' + sTime;
+                        const newEndDT = importEndDate + 'T' + eTime;
+                        const evStartDT = ev.date + 'T' + ev.startTime;
+                        const evEndDT = evEnd + 'T' + ev.endTime;
+                        return ev.room === roomName && newStartDT < evEndDT && newEndDT > evStartDT;
                     });
                     if (isConflict) {
                         skipCount++;
@@ -513,6 +521,7 @@ function getFilteredData() {
                     
                     importList.push({
                         date: dateStr,
+                        endDate: importEndDate,
                         name: String(name).trim(),
                         employee: empName,
                         room: roomName,
@@ -991,6 +1000,62 @@ document.querySelectorAll('.short-input').forEach(input=>{
         } catch(e) { alert("新增失敗：" + e.message); }
     }
 }
+
+    // === Todos Button ===
+    const todosBtn = document.getElementById('todosBtn');
+    const todosModal = document.getElementById('todosModal');
+    const addTodoBtn = document.getElementById('addTodoBtn');
+
+    if (todosBtn) {
+        todosBtn.onclick = async () => {
+            const todoRoom = document.getElementById('todoRoom');
+            const todoEmployee = document.getElementById('todoEmployee');
+            todoRoom.innerHTML = '<option value="">不指定</option>';
+            todoEmployee.innerHTML = '<option value="">不指定</option>';
+            roomList.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r.name; opt.textContent = r.name;
+                todoRoom.appendChild(opt);
+            });
+            empList.forEach(e => {
+                const opt = document.createElement('option');
+                opt.value = e.name; opt.textContent = e.name;
+                todoEmployee.appendChild(opt);
+            });
+            document.getElementById('todoStartDate').value = getTodayStr();
+            document.getElementById('todoEndDate').value = getTodayStr();
+            document.getElementById('todoTitle').value = '';
+            document.getElementById('todoAllDay').checked = false;
+            await loadTodos();
+            renderTodos();
+            todosModal.classList.add('active');
+        };
+    }
+
+    if (addTodoBtn) {
+        addTodoBtn.onclick = async () => {
+            const title = document.getElementById('todoTitle').value.trim();
+            const startDate = document.getElementById('todoStartDate').value;
+            const endDate = document.getElementById('todoEndDate').value;
+            const room = document.getElementById('todoRoom').value;
+            const employee = document.getElementById('todoEmployee').value;
+            const isAllDay = document.getElementById('todoAllDay').checked;
+            if (!title || !startDate || !endDate) return alert('請填寫標題和日期');
+            if (endDate < startDate) return alert('結束日期不能早於開始日期');
+            try {
+                const res = await fetch(`${API_BASE}/todos`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, startDate, endDate, room, employee, isAllDay })
+                });
+                const result = await res.json();
+                if (!result.ok) return alert(result.msg);
+                document.getElementById('todoTitle').value = '';
+                await loadTodos();
+                renderTodos();
+            } catch (err) { alert('新增失敗：' + err.message); }
+        };
+    }
 });
 
 // --- 視圖控制 ---
@@ -1106,35 +1171,39 @@ function renderMonthView() {
         }
 
         eventsData.forEach((ev, index) => {
-    if (ev.date === dateStr) {
-        // 套用篩選
-        if (filterEmployee && ev.employee !== filterEmployee) return;
-        if (filterRoom && ev.room !== filterRoom) return;
-        const evEl = document.createElement("div");
-        evEl.className = "event-label";
-        const style = getRoomStyle(ev.room);
-        const dispRoom = getRoomDisplayText(ev.room);
-        // 嚴格使用反引號，順序：時間 → 名稱 → 房間
-        evEl.innerHTML = `<strong>${ev.startTime}</strong> ${ev.name}｜${dispRoom}`;
-        evEl.style.cssText = `
-            background-color: ${style.label};
-            color:#ffffff;
-            font-size:11px;
-            line-height:1.3;
-            padding:2px 4px;
-            border-radius:3px;
-            margin:1px 0;
-            overflow:hidden;
-            white-space:nowrap;
-            text-overflow:ellipsis;
-            cursor:pointer;
-        `;
-        evEl.onclick = (e) => {
-            e.stopPropagation();
-            showEventDetails(index);
-        };
-        dayDiv.appendChild(evEl);
-    }
+    const evEndDate = ev.endDate || ev.date;
+    const isOnStartDate = ev.date === dateStr;
+    const isOnEndDate = evEndDate === dateStr && evEndDate !== ev.date;
+    
+    if (!isOnStartDate && !isOnEndDate) return;
+    // 套用篩選
+    if (filterEmployee && ev.employee !== filterEmployee) return;
+    if (filterRoom && ev.room !== filterRoom) return;
+    const evEl = document.createElement("div");
+    evEl.className = "event-label";
+    const style = getRoomStyle(ev.room);
+    const dispRoom = getRoomDisplayText(ev.room);
+    const prefix = isOnEndDate ? '[跨日] ' : '';
+    // 嚴格使用反引號，順序：時間 → 名稱 → 房間
+    evEl.innerHTML = `<strong>${ev.startTime}-${ev.endTime}</strong> ${prefix}${ev.name}｜${dispRoom}`;
+    evEl.style.cssText = `
+        background-color: ${style.label};
+        color:#ffffff;
+        font-size:11px;
+        line-height:1.3;
+        padding:2px 4px;
+        border-radius:3px;
+        margin:1px 0;
+        overflow:hidden;
+        white-space:nowrap;
+        text-overflow:ellipsis;
+        cursor:pointer;
+    `;
+    evEl.onclick = (e) => {
+        e.stopPropagation();
+        showEventDetails(index);
+    };
+    dayDiv.appendChild(evEl);
 });
         calendarDays.appendChild(dayDiv);
     }
@@ -1184,7 +1253,9 @@ eventGrid.classList.remove("week-mode");
 function renderEventsIntoColumn(columnElement, dateStr) {
     const startHour = 0;
     const dayEvents = eventsData.filter(ev => {
-        if (ev.date !== dateStr) return false;
+        const isOnStart = ev.date === dateStr;
+        const isOnEnd = ev.endDate && ev.endDate === dateStr && ev.endDate !== ev.date;
+        if (!isOnStart && !isOnEnd) return false;
         if (filterEmployee && ev.employee !== filterEmployee) return false;
         if (filterRoom && ev.room !== filterRoom) return false;
         return true;
@@ -1210,9 +1281,19 @@ function renderEventsIntoColumn(columnElement, dateStr) {
             const perWidthPct = 100 / visibleList.length;
 
             visibleList.forEach((ev, idx) => {
-                const [sH, sM] = ev.startTime.split(':').map(Number);
+                let displayStart = ev.startTime;
+                let displayEnd = ev.endTime;
+                const isOnEnd = ev.endDate && ev.endDate === dateStr && ev.endDate !== ev.date;
+                const isOnStart = ev.date === dateStr;
+                if (isOnEnd) {
+                    displayStart = '00:00';
+                }
+                if (isOnStart && ev.endDate && ev.endDate !== ev.date) {
+                    displayEnd = '23:30';
+                }
+                const [sH, sM] = displayStart.split(':').map(Number);
                 const top = ((sH - startHour) * 60) + sM;
-                let height = ((ev.endTime.split(':').map(Number)[0] - sH) * 60) + (ev.endTime.split(':').map(Number)[1] - sM);
+                let height = ((displayEnd.split(':').map(Number)[0] - sH) * 60) + (displayEnd.split(':').map(Number)[1] - sM);
                 if (height < 20) height = 20;
 
                 const roomStyle = getRoomStyle(ev.room);
@@ -1372,7 +1453,12 @@ function showEventDetails(index) {
     const style = getRoomStyle(ev.room);
     document.getElementById('viewEventTitle').innerText = ev.name;
     document.getElementById('viewEventDate').innerText = formatDateFull(new Date(ev.date));
-    document.getElementById('viewEventTime').innerText = `${ev.startTime} - ${ev.endTime}`;
+    const evEnd = ev.endDate || ev.date;
+    if (evEnd !== ev.date) {
+        document.getElementById('viewEventTime').innerText = `${ev.startTime} (${ev.date}) → ${ev.endTime} (${evEnd})`;
+    } else {
+        document.getElementById('viewEventTime').innerText = `${ev.startTime} - ${ev.endTime}`;
+    }
     document.getElementById('viewEventRoom').innerText = ev.room;
     document.querySelector('#viewEventEmployee span').innerText = ev.employee;
     document.getElementById('detailBar').style.backgroundColor = style.border;
@@ -1547,17 +1633,24 @@ bookBtn.onclick = async (e) => {
         console.log("[BOOK] BLOCKED: bad time format");
         return alert("時間格式必須為 00:00，不能包含其他文字");
     }
-    if (startTime >= endTime) { console.log("[BOOK] BLOCKED: start >= end"); return alert("結束時間必須晚於開始時間"); }
-    if(endTime > "23:30") { console.log("[BOOK] BLOCKED: endTime > 23:30"); return alert("結束時間不能超過 23:30"); }
     // 強制日期格式 YYYY-MM-DD 檢查
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         console.log("[BOOK] BLOCKED: bad date format");
         return alert("日期格式非法");
     }
 
+    // 跨日預約：結束時間早於開始時間 → 隔日結束
+    let endDate = date;
+    if (startTime >= endTime) {
+        const nextDay = new Date(date + 'T00:00:00');
+        nextDay.setDate(nextDay.getDate() + 1);
+        endDate = getFormattedDate(nextDay);
+    }
+
     // 4. 組裝完全乾淨、符合後端規範的物件
     const newEv = {
         date: date,
+        endDate: endDate,
         name: name,
         employee: employee,
         room: room,
@@ -1573,9 +1666,15 @@ bookBtn.onclick = async (e) => {
         if(!confirmPast) return;
     }
 
-    // 前端時段衝突檢查
+    // 前端時段衝突檢查（支援跨日）
     const isConflict = eventsData.some((ev, idx) => {
-        return idx !== currentViewIndex && ev.date === date && ev.room === room && startTime < ev.endTime && endTime > ev.startTime;
+        if (idx === currentViewIndex || ev.room !== room) return false;
+        const evEnd = ev.endDate || ev.date;
+        const newStartDT = date + 'T' + startTime;
+        const newEndDT = endDate + 'T' + endTime;
+        const evStartDT = ev.date + 'T' + ev.startTime;
+        const evEndDT = evEnd + 'T' + ev.endTime;
+        return newStartDT < evEndDT && newEndDT > evStartDT;
     });
     if (isConflict) { console.log("[BOOK] BLOCKED: conflict"); return alert("該時段房間已有預約"); }
 
@@ -2056,4 +2155,51 @@ async function saveAnnouncement(text) {
     });
   } catch(err) { console.error("公告儲存失敗:", err); }
   renderAnnouncement();
+}
+
+// === Todos ===
+let todosData = [];
+
+async function loadTodos() {
+    try {
+        const res = await fetch(`${API_BASE}/todos`);
+        const json = await res.json();
+        if (json.ok) todosData = json.data;
+    } catch (err) { console.error("載入代辦事項失敗:", err); }
+}
+
+function renderTodos() {
+    const wrap = document.getElementById('todoListWrap');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    if (todosData.length === 0) {
+        wrap.innerHTML = '<div style="color:#888;text-align:center;padding:12px;">暫無代辦事項</div>';
+        return;
+    }
+    todosData.forEach(todo => {
+        const div = document.createElement('div');
+        div.className = 'list-item';
+        div.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid #eee;';
+        let dateRange = todo.startDate;
+        if (todo.endDate !== todo.startDate) dateRange += ' ~ ' + todo.endDate;
+        let info = `<div><b>${todo.title}</b><br><span style="font-size:12px;color:#666;">${dateRange}`;
+        if (todo.room) info += ` | ${todo.room}`;
+        if (todo.employee) info += ` | ${todo.employee}`;
+        if (todo.isAllDay) info += ' | 全日';
+        info += '</span></div>';
+        div.innerHTML = `
+            ${info}
+            <button class="delete-x-btn" title="刪除" onclick="deleteTodo(${todo.id})"><i class="fa-solid fa-xmark"></i></button>
+        `;
+        wrap.appendChild(div);
+    });
+}
+
+async function deleteTodo(id) {
+    if (!confirm('確定刪除此代辦事項？')) return;
+    try {
+        await fetch(`${API_BASE}/todos/${id}`, { method: 'DELETE' });
+        await loadTodos();
+        renderTodos();
+    } catch (err) { alert('刪除失敗：' + err.message); }
 }

@@ -1001,15 +1001,6 @@ document.querySelectorAll('.short-input').forEach(input=>{
     }
 }
 
-function initTodosModal() {
-    const addBtn = document.getElementById('addTodoBtn');
-    if (!addBtn) return;
-    addBtn.textContent = '新增代辦事項';
-    delete addBtn.dataset.editId;
-    addBtn.disabled = false;
-    addBtn.onclick = null; // will be re-bound below
-}
-
     // === Todos Button ===
     const todosBtn = document.getElementById('todosBtn');
     const todosModal = document.getElementById('todosModal');
@@ -1049,6 +1040,7 @@ function initTodosModal() {
         let todoBusy = false;
         addTodoBtn.onclick = async () => {
             if (todoBusy) return;
+            const editId = addTodoBtn.dataset.editId;
             const title = document.getElementById('todoTitle').value.trim();
             const startDate = document.getElementById('todoStartDate').value;
             const endDate = document.getElementById('todoEndDate').value;
@@ -1062,48 +1054,60 @@ function initTodosModal() {
 
             todoBusy = true;
             addTodoBtn.disabled = true;
-            addTodoBtn.textContent = '新增中...';
 
             try {
-                // Collect selected weekdays
-                const selectedDays = Array.from(document.querySelectorAll('.todo-dow:checked')).map(cb => parseInt(cb.value));
-
-                if (selectedDays.length === 0) {
-                    const res = await fetch(`${API_BASE}/todos`, {
-                        method: 'POST',
+                if (editId) {
+                    // Edit mode — update single todo, changes detach it from its group
+                    await fetch(`${API_BASE}/todos/${editId}`, {
+                        method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ title, startDate, endDate, startTime, endTime, room, employee, isAllDay })
                     });
-                    const result = await res.json();
-                    if (!result.ok) { alert(result.msg); return; }
+                    document.getElementById('todosModal').classList.remove("active");
+                    delete addTodoBtn.dataset.editId;
+                    addTodoBtn.textContent = '新增代辦事項';
                 } else {
-                    const start = new Date(startDate + 'T00:00:00');
-                    const end = new Date(endDate + 'T00:00:00');
-                    let created = 0;
-                    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                        if (selectedDays.includes(d.getDay())) {
-                            const dateStr = getFormattedDate(d);
-                            await fetch(`${API_BASE}/todos`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ title, startDate: dateStr, endDate: dateStr, startTime, endTime, room, employee, isAllDay })
-                            });
-                            created++;
+                    // Add mode
+                    addTodoBtn.textContent = '新增中...';
+                    const selectedDays = Array.from(document.querySelectorAll('.todo-dow:checked')).map(cb => parseInt(cb.value));
+
+                    if (selectedDays.length === 0) {
+                        const res = await fetch(`${API_BASE}/todos`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ title, startDate, endDate, startTime, endTime, room, employee, isAllDay })
+                        });
+                        const result = await res.json();
+                        if (!result.ok) { alert(result.msg); return; }
+                    } else {
+                        const start = new Date(startDate + 'T00:00:00');
+                        const end = new Date(endDate + 'T00:00:00');
+                        let created = 0;
+                        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                            if (selectedDays.includes(d.getDay())) {
+                                const dateStr = getFormattedDate(d);
+                                await fetch(`${API_BASE}/todos`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ title, startDate: dateStr, endDate: dateStr, startTime, endTime, room, employee, isAllDay })
+                                });
+                                created++;
+                            }
                         }
+                        if (created === 0) { alert('日期範圍內沒有符合的星期幾'); return; }
                     }
-                    if (created === 0) { alert('日期範圍內沒有符合的星期幾'); return; }
+                    document.getElementById('todoTitle').value = '';
+                    document.querySelectorAll('.todo-dow').forEach(cb => cb.checked = false);
                 }
 
-                document.getElementById('todoTitle').value = '';
-                document.querySelectorAll('.todo-dow').forEach(cb => cb.checked = false);
                 await loadTodos();
                 renderTodos();
                 updateView();
-            } catch (err) { alert('新增失敗：' + err.message); }
+            } catch (err) { alert('操作失敗：' + err.message); }
             finally {
                 todoBusy = false;
                 addTodoBtn.disabled = false;
-                addTodoBtn.textContent = '新增代辦事項';
+                if (!addTodoBtn.dataset.editId) addTodoBtn.textContent = '新增代辦事項';
             }
         };
     }
@@ -2315,24 +2319,23 @@ function showTodoDetail(todo) {
     document.getElementById('todoDetailDate').textContent = '日期：' + dateText;
     let timeText = todo.isAllDay ? '全日' : (todo.startTime || '');
     if (timeText && todo.endTime) timeText += ' ~ ' + todo.endTime;
-    document.getElementById('todoDetailTime').textContent = todo.room ? '房間：' + todo.room : '';
+    document.getElementById('todoDetailTime').textContent = timeText ? '時間：' + timeText : '';
     document.getElementById('todoDetailRoom').textContent = todo.room || '';
     document.getElementById('todoDetailEmployee').innerHTML = '負責人：<span>' + (todo.employee || '') + '</span>';
-    document.getElementById('todoDetailTime').textContent = timeText ? '時間：' + timeText : '';
 
     document.getElementById('btnDeleteTodoDetail').onclick = async () => {
         if (!confirm('確定刪除此代辦事項？')) return;
         await fetch(`${API_BASE}/todos/${todo.id}`, { method: 'DELETE' });
-        modal.classList.remove("show");
+        modal.classList.remove("active");
         await loadTodos(); renderTodos(); updateView();
     };
     document.getElementById('btnEditTodoDetail').onclick = () => {
-        modal.classList.remove("show");
+        modal.classList.remove("active");
         editTodoItem(todo);
     };
-    document.getElementById('btnCloseTodoDetail').onclick = () => modal.classList.remove("show");
-    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove("show"); };
-    modal.classList.add("show");
+    document.getElementById('btnCloseTodoDetail').onclick = () => modal.classList.remove("active");
+    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove("active"); };
+    modal.classList.add("active");
 }
 
 function editTodoItem(todo) {
@@ -2344,33 +2347,11 @@ function editTodoItem(todo) {
     document.getElementById('todoRoom').value = todo.room || '';
     document.getElementById('todoEmployee').value = todo.employee || '';
     document.getElementById('todoAllDay').checked = todo.isAllDay;
-    document.getElementById('todosModal').classList.add("show");
-    // Change add button to update mode
+    document.getElementById('todosModal').classList.add("active");
+    // Put into edit mode — the existing addTodoBtn handler checks editId
     const addBtn = document.getElementById('addTodoBtn');
     addBtn.textContent = '更新代辦事項';
     addBtn.dataset.editId = todo.id;
-    addBtn.onclick = async () => {
-        if (!confirm('確定更新此代辦事項？')) return;
-        await fetch(`${API_BASE}/todos/${todo.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                title: document.getElementById('todoTitle').value.trim(),
-                startDate: document.getElementById('todoStartDate').value,
-                endDate: document.getElementById('todoEndDate').value,
-                startTime: document.getElementById('todoStartTime').value,
-                endTime: document.getElementById('todoEndTime').value,
-                room: document.getElementById('todoRoom').value,
-                employee: document.getElementById('todoEmployee').value,
-                isAllDay: document.getElementById('todoAllDay').checked
-            })
-        });
-        document.getElementById('todosModal').classList.remove("show");
-        addBtn.textContent = '新增代辦事項';
-        delete addBtn.dataset.editId;
-        await loadTodos(); renderTodos(); updateView();
-        initTodosModal(); // restore normal add behavior
-    };
 }
 
 // old single deleteTodo removed — now using deleteTodoGroup and detail modal

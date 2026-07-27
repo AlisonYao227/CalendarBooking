@@ -423,6 +423,7 @@ function getFilteredData() {
             try {
                 const data = new Uint8Array(evt.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
+                await loadAllData();
                 
                 let totalSuccess = 0, totalSkip = 0, newRoomCount = 0, newEmpCount = 0;
                 const allSkipList = [];
@@ -513,6 +514,13 @@ function getFilteredData() {
                             const employee = get('employee') ? String(get('employee')).trim() : '';
                             const isAllDayRaw = get('isAllDay');
                             const isAllDay = (isAllDayRaw === '是' || isAllDayRaw === true || isAllDayRaw === 1) ? 1 : 0;
+                            // Check for duplicate
+                            const isDuplicate = todosData.some(t =>
+                                t.title === title && t.startDate === startDate && t.endDate === endDate &&
+                                (t.startTime||'') === startTime && (t.endTime||'') === endTime &&
+                                (t.room||'') === room && (t.employee||'') === employee
+                            );
+                            if (isDuplicate) { totalSkip++; allSkipList.push(`[待辦]「${title}」${startDate} 已存在，跳過`); continue; }
                             try { await fetch(`${API_BASE}/todos`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({title,startDate,endDate,startTime,endTime,room,employee,isAllDay}) }); totalSuccess++; } catch(err) { totalSkip++; allSkipList.push(`[待辦]「${title}」匯入失敗：${err.message}`); }
                         }
 

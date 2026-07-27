@@ -400,7 +400,7 @@ function getFilteredData() {
     importTipBtn.onclick = (e) => {
         e.stopPropagation();
         // 固定前置格式說明，每次點擊都顯示
-        let tipText = "【Excel標準格式規範】\n請按照系統匯出Excel欄位建立表格：\n必填欄位：日期、活動名稱、預約員工、房間、開始時間、結束時間\n時間格式範例：09:00、23:30；支援跨日預約（結束時間早於開始時間自動視為隔日結束）\n\n";
+        let tipText = "【Excel匯入格式規範】\n支援多Sheet匯入，系統會自動偵測每個Sheet的欄位：\n\n📋 Sheet 1「預約」欄位：日期、活動名稱、預約員工、房間、開始時間、結束時間、結束日期(選填)\n📋 Sheet 2「待辦事項」欄位：標題、開始日期、結束日期、開始時間、結束時間、房間、負責人、全日\n📋 Sheet 3「公眾假期」由系統自動抓取，無需匯入\n\n時間格式：09:00、23:30\n日期格式：2026-01-15\n支援跨日預約（結束時間早於開始時間自動視為隔日結束）\n\n";
 
         if(currentImportSkipList.length > 0){
             // 有異常：規範 + 完整錯誤清單
@@ -423,187 +423,121 @@ function getFilteredData() {
             try {
                 const data = new Uint8Array(evt.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rawData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
                 
-                if (rawData.length === 0) {
-                    alert("Excel 內沒有任何資料");
-                    return;
-                }
-                
-                const headerRow = rawData[0];
-                const headerMap = {};
-                headerRow.forEach((h, i) => {
-                    const key = String(h || '').trim();
-                    if (key === '日期' || key === 'date') headerMap.date = i;
-                    else if (key === '活動名稱' || key === '名稱' || key === 'name') headerMap.name = i;
-                    else if (key === '預約員工' || key === '預約人' || key === 'employee') headerMap.employee = i;
-                    else if (key === '房間' || key === 'room') headerMap.room = i;
-                    else if (key === '開始時間' || key === 'startTime' || key === 'start') headerMap.startTime = i;
-                    else if (key === '結束時間' || key === 'endTime' || key === 'end') headerMap.endTime = i;
-                    else if (key === '結束日期' || key === 'endDate') headerMap.endDate = i;
-                });
-                
-                let successCount = 0;
-                let skipCount = 0;
-                let newRoomCount = 0;
-                let newEmpCount = 0;
-                const skipList = [];
-                const importList = [];
-                
-                const newRooms = new Set();
-                const newEmps = new Set();
-                
-                const dataRows = rawData.slice(1);
-                
-                dataRows.forEach((row, rawIdx) => {
-                    const excelRow = rawIdx + 2;
-                    
-                    const isEmpty = !row || row.every(c => c === null || c === undefined || String(c).trim() === '');
-                    if (isEmpty) return;
-                    
-                    const get = (key) => headerMap[key] !== undefined ? row[headerMap[key]] : undefined;
-                    
-                    const dateRaw = get('date');
-                    const name = get('name');
-                    const employee = get('employee');
-                    const room = get('room');
-                    const startRaw = get('startTime');
-                    const endRaw = get('endTime');
-                    
-                    if (dateRaw === undefined || !name || !employee || !room || startRaw === undefined || endRaw === undefined) {
-                        skipCount++;
-                        skipList.push(`第${excelRow}行：欄位不全`);
-                        return;
-                    }
-                    
-                    const dateStr = excelDateToStr(dateRaw);
-                    const sTime = excelTimeToStr(startRaw);
-                    const eTime = excelTimeToStr(endRaw);
-                    
-                    // Calculate endDate for cross-day support
-                    let importEndDate = dateStr;
-                    if (headerMap.endDate !== undefined) {
-                        const rawEndDate = get('endDate');
-                        if (rawEndDate) importEndDate = excelDateToStr(rawEndDate);
-                    } else if (sTime >= eTime) {
-                        const nextDay = new Date(dateStr);
-                        nextDay.setDate(nextDay.getDate() + 1);
-                        importEndDate = getFormattedDate(nextDay);
-                    }
-                    
-                    const roomName = String(room).trim();
-                    const empName = String(employee).trim();
-                    
-                    if (!roomList.some(item => item.name === roomName) && !newRooms.has(roomName)) {
-                        newRooms.add(roomName);
-                        newRoomCount++;
-                    }
-                    
-                    if (!empList.some(e => e.name === empName) && !newEmps.has(empName)) {
-                        newEmps.add(empName);
-                        newEmpCount++;
-                    }
-                    
-                    const isConflict = eventsData.some(ev => {
-                        const evEnd = ev.endDate || ev.date;
-                        const newStartDT = dateStr + 'T' + sTime;
-                        const newEndDT = importEndDate + 'T' + eTime;
-                        const evStartDT = ev.date + 'T' + ev.startTime;
-                        const evEndDT = evEnd + 'T' + ev.endTime;
-                        return ev.room === roomName && newStartDT < evEndDT && newEndDT > evStartDT;
-                    });
-                    if (isConflict) {
-                        skipCount++;
-                        skipList.push(`第${excelRow}行「${name}」：${dateStr} ${roomName} 時段衝突`);
-                        return;
-                    }
-                    
-                    importList.push({
-                        date: dateStr,
-                        endDate: importEndDate,
-                        name: String(name).trim(),
-                        employee: empName,
-                        room: roomName,
-                        startTime: sTime,
-                        endTime: eTime
-                    });
-                    successCount++;
-                });
-                
-                // 自動新增房間到後端
-                for (const rName of newRooms) {
-                    try {
-                        const color = generateRandomRoomColor();
-                        const res = await fetch(`${API_BASE}/rooms`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ name: rName, short: '', colorData: JSON.stringify(color) })
+                let totalSuccess = 0, totalSkip = 0, newRoomCount = 0, newEmpCount = 0;
+                const allSkipList = [];
+                const allNewRooms = new Set();
+                const allNewEmps = new Set();
+
+                for (const sheetName of workbook.SheetNames) {
+                    const sheet = workbook.Sheets[sheetName];
+                    const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                    if (rawData.length < 2) continue;
+
+                    const headerRow = rawData[0];
+                    const headers = headerRow.map(h => String(h || '').trim().toLowerCase());
+
+                    if (headers.includes('活動名稱') || headers.includes('預約員工') || headers.includes('預約人')) {
+                        // === RESERVATION SHEET ===
+                        const headerMap = {};
+                        headerRow.forEach((h, i) => {
+                            const key = String(h || '').trim();
+                            if (key === '日期' || key === 'date') headerMap.date = i;
+                            else if (key === '活動名稱' || key === '名稱' || key === 'name') headerMap.name = i;
+                            else if (key === '預約員工' || key === '預約人' || key === 'employee') headerMap.employee = i;
+                            else if (key === '房間' || key === 'room') headerMap.room = i;
+                            else if (key === '開始時間' || key === 'startTime' || key === 'start') headerMap.startTime = i;
+                            else if (key === '結束時間' || key === 'endTime' || key === 'end') headerMap.endTime = i;
+                            else if (key === '結束日期' || key === 'endDate') headerMap.endDate = i;
                         });
-                        const result = await res.json();
-                        if (result.ok) roomColorMap[rName] = color;
-                    } catch(e) { console.error("自動新增房間失敗:", e); }
-                }
-                
-                // 自動新增員工到後端
-                for (const eName of newEmps) {
-                    try {
-                        await fetch(`${API_BASE}/employees`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ name: eName })
+                        const importList = [];
+                        rawData.slice(1).forEach((row, rawIdx) => {
+                            const excelRow = rawIdx + 2;
+                            if (!row || row.every(c => c === null || c === undefined || String(c).trim() === '')) return;
+                            const get = (key) => headerMap[key] !== undefined ? row[headerMap[key]] : undefined;
+                            const dateRaw = get('date'); const name = get('name'); const employee = get('employee');
+                            const room = get('room'); const startRaw = get('startTime'); const endRaw = get('endTime');
+                            if (dateRaw === undefined || !name || !employee || !room || startRaw === undefined || endRaw === undefined) {
+                                totalSkip++; allSkipList.push(`[預約]第${excelRow}行：欄位不全`); return;
+                            }
+                            const dateStr = excelDateToStr(dateRaw);
+                            const sTime = excelTimeToStr(startRaw);
+                            const eTime = excelTimeToStr(endRaw);
+                            let importEndDate = dateStr;
+                            if (headerMap.endDate !== undefined) {
+                                const rawEndDate = get('endDate');
+                                if (rawEndDate) importEndDate = excelDateToStr(rawEndDate);
+                            } else if (sTime >= eTime) {
+                                const nextDay = new Date(dateStr); nextDay.setDate(nextDay.getDate() + 1);
+                                importEndDate = getFormattedDate(nextDay);
+                            }
+                            const roomName = String(room).trim(); const empName = String(employee).trim();
+                            if (!roomList.some(item => item.name === roomName) && !allNewRooms.has(roomName)) { allNewRooms.add(roomName); newRoomCount++; }
+                            if (!empList.some(e => e.name === empName) && !allNewEmps.has(empName)) { allNewEmps.add(empName); newEmpCount++; }
+                            const isConflict = eventsData.some(ev => {
+                                const evEnd = ev.endDate || ev.date;
+                                return ev.room === roomName && (dateStr+'T'+sTime) < (evEnd+'T'+ev.endTime) && (importEndDate+'T'+eTime) > (ev.date+'T'+ev.startTime);
+                            });
+                            if (isConflict) { totalSkip++; allSkipList.push(`[預約]第${excelRow}行「${name}」：${dateStr} ${roomName} 時段衝突`); return; }
+                            importList.push({ date: dateStr, endDate: importEndDate, name: String(name).trim(), employee: empName, room: roomName, startTime: sTime, endTime: eTime });
+                            totalSuccess++;
                         });
-                    } catch(e) { console.error("自動新增員工失敗:", e); }
-                }
-                
-                // 批量匯入預約到後端
-                if (importList.length > 0) {
-                    try {
-                        const res = await fetch(`${API_BASE}/reservations/batch`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ list: importList })
-                        });
-                        const result = await res.json();
-                        if (!result.ok) {
-                            skipCount += importList.length;
-                            skipList.push("批量匯入失敗：" + result.msg);
+                        if (importList.length > 0) {
+                            try { const res = await fetch(`${API_BASE}/reservations/batch`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({list:importList}) }); const result = await res.json(); if (!result.ok) { totalSkip += importList.length; allSkipList.push("[預約]批量匯入失敗："+result.msg); } } catch(err) { totalSkip += importList.length; allSkipList.push("[預約]批量匯入失敗："+err.message); }
                         }
-                    } catch(err) {
-                        skipCount += importList.length;
-                        skipList.push("批量匯入失敗：" + err.message);
+
+                    } else if (headers.includes('標題') || headers.includes('開始日期')) {
+                        // === TODO SHEET ===
+                        const headerMap = {};
+                        headerRow.forEach((h, i) => {
+                            const key = String(h || '').trim();
+                            if (key === '標題' || key === 'title') headerMap.title = i;
+                            else if (key === '開始日期') headerMap.startDate = i;
+                            else if (key === '結束日期') headerMap.endDate = i;
+                            else if (key === '開始時間') headerMap.startTime = i;
+                            else if (key === '結束時間') headerMap.endTime = i;
+                            else if (key === '房間') headerMap.room = i;
+                            else if (key === '負責人') headerMap.employee = i;
+                            else if (key === '全日') headerMap.isAllDay = i;
+                        });
+                        for (const row of rawData.slice(1)) {
+                            if (!row || row.every(c => c === null || c === undefined || String(c).trim() === '')) continue;
+                            const get = (key) => headerMap[key] !== undefined ? row[headerMap[key]] : undefined;
+                            const title = get('title'); const startDateRaw = get('startDate');
+                            if (!title || !startDateRaw) { totalSkip++; allSkipList.push(`[待辦]缺少標題或開始日期`); continue; }
+                            const startDate = excelDateToStr(startDateRaw);
+                            const endDateRaw = get('endDate'); const endDate = endDateRaw ? excelDateToStr(endDateRaw) : startDate;
+                            const startTime = get('startTime') ? excelTimeToStr(get('startTime')) : '';
+                            const endTime = get('endTime') ? excelTimeToStr(get('endTime')) : '';
+                            const room = get('room') ? String(get('room')).trim() : '';
+                            const employee = get('employee') ? String(get('employee')).trim() : '';
+                            const isAllDayRaw = get('isAllDay');
+                            const isAllDay = (isAllDayRaw === '是' || isAllDayRaw === true || isAllDayRaw === 1) ? 1 : 0;
+                            try { await fetch(`${API_BASE}/todos`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({title,startDate,endDate,startTime,endTime,room,employee,isAllDay}) }); totalSuccess++; } catch(err) { totalSkip++; allSkipList.push(`[待辦]「${title}」匯入失敗：${err.message}`); }
+                        }
+
+                    } else if (headers.includes('名稱') && headers.includes('日期') && !headers.includes('活動名稱')) {
+                        totalSkip++; allSkipList.push(`[假期]假期資料由系統自動抓取，無需匯入`);
                     }
                 }
-                
-                // 重新載入所有資料
-                console.log("[IMPORT] calling loadAllData...");
+
+                for (const rName of allNewRooms) { try { const color = generateRandomRoomColor(); await fetch(`${API_BASE}/rooms`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({name:rName,short:'',colorData:JSON.stringify(color)}) }); } catch(e) {} }
+                for (const eName of allNewEmps) { try { await fetch(`${API_BASE}/employees`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({name:eName}) }); } catch(e) {} }
+
                 await loadAllData();
-                console.log("[IMPORT] after loadAllData, eventsData.length=", eventsData.length, "eventsData=", JSON.stringify(eventsData.slice(-5)));
+                await loadHolidays(new Date().getFullYear());
                 updateView();
                 
-                currentImportSkipList = [...skipList];
-
-let resultMsg = `匯入完成！
-✅ 成功：${successCount} 條
-⚠️ 跳過：${skipCount} 條`;
-if (newRoomCount > 0) resultMsg += `
-🏠 自動新增房間：${newRoomCount} 個`;
-if (newEmpCount > 0) resultMsg += `
-👤 自動新增員工：${newEmpCount} 位`;
-
-if (skipList.length > 0) {
-    if(successCount === 0){
-        resultMsg += `
-
-⚠️ 所有數據均跳過，極可能Excel欄位格式不匹配！
-點擊匯入旁邊「i」小按鈕查看完整錯誤原因`;
-    }else{
-        resultMsg += `
-
-點擊匯入旁邊「i」小按鈕可查看全部跳過異常明細`;
-    }
-}
-alert(resultMsg);
+                currentImportSkipList = [...allSkipList];
+                let resultMsg = `匯入完成！\n✅ 成功：${totalSuccess} 條\n⚠️ 跳過：${totalSkip} 條`;
+                if (newRoomCount > 0) resultMsg += `\n🏠 自動新增房間：${newRoomCount} 個`;
+                if (newEmpCount > 0) resultMsg += `\n👤 自動新增員工：${newEmpCount} 位`;
+                if (allSkipList.length > 0) {
+                    resultMsg += totalSuccess === 0
+                        ? `\n\n⚠️ 所有數據均跳過，極可能Excel欄位格式不匹配！\n點擊匯入旁邊「i」小按鈕查看完整錯誤原因`
+                        : `\n\n點擊匯入旁邊「i」小按鈕可查看全部跳過異常明細`;
+                }
+                alert(resultMsg);
                 
             } catch (err) {
                 console.error(err);
@@ -1862,7 +1796,6 @@ function getFilterEvents(range){
 // 匯出 Excel
 function exportExcel(range){
     const data = getFilterEvents(range);
-    if(data.length === 0) return alert("該範圍無任何預約記錄");
     const {year,month} = getCurrentViewYM();
     const monthStr = String(month + 1).padStart(2,"0");
     let fileName;
@@ -1882,23 +1815,83 @@ function exportExcel(range){
     }else{
         fileName = `預約_${year}.xlsx`;
     }
-    const sheetData = [
-        ["日期","活動名稱","預約員工","房間","開始時間","結束時間"]
-    ];
-    data.forEach(ev=>{
-        sheetData.push([
-            ev.date,
-            ev.name,
-            ev.employee,
-            ev.room,
-            ev.startTime,
-            ev.endTime
-        ])
-    })
+
     const book = XLSX.utils.book_new();
-    const sheet = XLSX.utils.aoa_to_sheet(sheetData);
-    XLSX.utils.book_append_sheet(book, sheet, "預約清單");
+
+    // Sheet 1: 預約
+    const resData = [["日期","活動名稱","預約員工","房間","開始時間","結束時間","結束日期"]];
+    data.forEach(ev=>{
+        resData.push([ev.date, ev.name, ev.employee, ev.room, ev.startTime, ev.endTime, ev.endDate || ''])
+    })
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(resData), "預約");
+
+    // Sheet 2: 待辦事項
+    const todoData = [["標題","開始日期","結束日期","開始時間","結束時間","房間","負責人","全日"]];
+    const filteredTodos = getFilteredTodos(range);
+    filteredTodos.forEach(t=>{
+        todoData.push([t.title, t.startDate, t.endDate, t.startTime||'', t.endTime||'', t.room||'', t.employee||'', t.isAllDay ? '是' : ''])
+    })
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(todoData), "待辦事項");
+
+    // Sheet 3: 公眾假期
+    const holidayData = [["日期","名稱","英文名稱"]];
+    const filteredHolidays = getFilteredHolidays(range);
+    filteredHolidays.forEach(h=>{
+        holidayData.push([h.date, h.name, h.name_en||''])
+    })
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(holidayData), "公眾假期");
+
     XLSX.writeFile(book, fileName);
+}
+
+function getFilteredTodos(range){
+    const {year,month} = getCurrentViewYM();
+    let list = [...todosData];
+    if(range === "currentMonth"){
+        list = list.filter(t => {
+            const ty = parseInt(t.startDate.split("-")[0]);
+            const tm = parseInt(t.startDate.split("-")[1]) - 1;
+            return ty === year && tm === month;
+        });
+    }else if(range === "currentDay"){
+        const d = getFormattedDate(selectedCalendarDate);
+        list = list.filter(t => t.startDate <= d && t.endDate >= d);
+    }else if(range === "currentWeek"){
+        const startOfWeek = new Date(currentDate);
+        startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        const ws = getFormattedDate(startOfWeek);
+        const we = getFormattedDate(endOfWeek);
+        list = list.filter(t => t.startDate <= we && t.endDate >= ws);
+    }
+    if(filterEmployee) list = list.filter(t => t.employee === filterEmployee);
+    if(filterRoom) list = list.filter(t => t.room === filterRoom);
+    return list;
+}
+
+function getFilteredHolidays(range){
+    const {year,month} = getCurrentViewYM();
+    let list = [...holidaysData];
+    if(range === "currentMonth"){
+        list = list.filter(h => {
+            const hy = parseInt(h.date.split("-")[0]);
+            const hm = parseInt(h.date.split("-")[1]) - 1;
+            return hy === year && hm === month;
+        });
+    }else if(range === "currentDay"){
+        const d = getFormattedDate(selectedCalendarDate);
+        list = list.filter(h => h.date === d);
+    }else if(range === "currentWeek"){
+        const startOfWeek = new Date(currentDate);
+        startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        const ws = getFormattedDate(startOfWeek);
+        const we = getFormattedDate(endOfWeek);
+        list = list.filter(h => h.date >= ws && h.date <= we);
+    }
+    return list;
 }
 
 // 匯出 PDF

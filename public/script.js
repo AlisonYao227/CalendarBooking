@@ -1025,7 +1025,11 @@ document.querySelectorAll('.short-input').forEach(input=>{
             document.getElementById('todoStartDate').value = getTodayStr();
             document.getElementById('todoEndDate').value = getTodayStr();
             document.getElementById('todoTitle').value = '';
+            // Reset time selects and weekday checkboxes
+            document.getElementById('todoStartTime').value = '';
+            document.getElementById('todoEndTime').value = '';
             document.getElementById('todoAllDay').checked = false;
+            document.querySelectorAll('.todo-dow').forEach(cb => cb.checked = false);
             await loadTodos();
             renderTodos();
             todosModal.classList.add('active');
@@ -1037,23 +1041,53 @@ document.querySelectorAll('.short-input').forEach(input=>{
             const title = document.getElementById('todoTitle').value.trim();
             const startDate = document.getElementById('todoStartDate').value;
             const endDate = document.getElementById('todoEndDate').value;
+            const startTime = document.getElementById('todoStartTime').value;
+            const endTime = document.getElementById('todoEndTime').value;
             const room = document.getElementById('todoRoom').value;
             const employee = document.getElementById('todoEmployee').value;
             const isAllDay = document.getElementById('todoAllDay').checked;
             if (!title || !startDate || !endDate) return alert('請填寫標題和日期');
             if (endDate < startDate) return alert('結束日期不能早於開始日期');
-            try {
-                const res = await fetch(`${API_BASE}/todos`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, startDate, endDate, room, employee, isAllDay })
-                });
-                const result = await res.json();
-                if (!result.ok) return alert(result.msg);
-                document.getElementById('todoTitle').value = '';
-                await loadTodos();
-                renderTodos();
-            } catch (err) { alert('新增失敗：' + err.message); }
+
+            // Collect selected weekdays
+            const selectedDays = Array.from(document.querySelectorAll('.todo-dow:checked')).map(cb => parseInt(cb.value));
+
+            if (selectedDays.length === 0) {
+                // No weekdays selected — create single todo
+                try {
+                    const res = await fetch(`${API_BASE}/todos`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title, startDate, endDate, startTime, endTime, room, employee, isAllDay })
+                    });
+                    const result = await res.json();
+                    if (!result.ok) return alert(result.msg);
+                } catch (err) { return alert('新增失敗：' + err.message); }
+            } else {
+                // Weekdays selected — create one todo per matching date in range
+                const start = new Date(startDate + 'T00:00:00');
+                const end = new Date(endDate + 'T00:00:00');
+                let created = 0;
+                for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                    if (selectedDays.includes(d.getDay())) {
+                        const dateStr = getFormattedDate(d);
+                        try {
+                            await fetch(`${API_BASE}/todos`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ title, startDate: dateStr, endDate: dateStr, startTime, endTime, room, employee, isAllDay })
+                            });
+                            created++;
+                        } catch (err) { console.error('批量新增失敗:', err); }
+                    }
+                }
+                if (created === 0) return alert('日期範圍內沒有符合的星期幾');
+            }
+
+            document.getElementById('todoTitle').value = '';
+            document.querySelectorAll('.todo-dow').forEach(cb => cb.checked = false);
+            await loadTodos();
+            renderTodos();
         };
     }
 });
@@ -1205,6 +1239,37 @@ function renderMonthView() {
     };
     dayDiv.appendChild(evEl);
 });
+        // Render todos on this day
+        todosData.forEach((todo) => {
+            if (todo.startDate <= dateStr && todo.endDate >= dateStr) {
+                const evEl = document.createElement("div");
+                evEl.className = "event-label todo-label";
+                let timeStr = todo.isAllDay ? '' : (todo.startTime || '');
+                if (timeStr && todo.endTime) timeStr += '-' + todo.endTime;
+                let dispRoom = todo.room ? getRoomDisplayText(todo.room) : '';
+                const empStr = todo.employee ? todo.employee : '';
+                evEl.innerHTML = `<span class="todo-marker"></span><strong>${timeStr}</strong> ${todo.name}` + (dispRoom ? `｜${dispRoom}` : '') + (empStr ? ` (${empStr})` : '');
+                evEl.style.cssText = `
+                    background-color: #fff8e1;
+                    color: #5d4037;
+                    font-size:11px;
+                    line-height:1.3;
+                    padding:2px 4px;
+                    border-radius:3px;
+                    margin:1px 0;
+                    overflow:hidden;
+                    white-space:nowrap;
+                    text-overflow:ellipsis;
+                    cursor:pointer;
+                    border-left:3px solid #f9a825;
+                `;
+                evEl.onclick = (e) => {
+                    e.stopPropagation();
+                    alert(`代辦事項：${todo.name}\n日期：${todo.startDate}${todo.endDate !== todo.startDate ? ' ~ ' + todo.endDate : ''}\n${timeStr ? '時間：' + timeStr + '\n' : ''}${todo.room ? '房間：' + todo.room + '\n' : ''}${todo.employee ? '負責人：' + todo.employee : ''}`);
+                };
+                dayDiv.appendChild(evEl);
+            }
+        });
         calendarDays.appendChild(dayDiv);
     }
 }
@@ -2182,6 +2247,9 @@ function renderTodos() {
         div.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid #eee;';
         let dateRange = todo.startDate;
         if (todo.endDate !== todo.startDate) dateRange += ' ~ ' + todo.endDate;
+        if (todo.startTime && todo.endTime) dateRange += ' ' + todo.startTime + '-' + todo.endTime;
+        else if (todo.startTime) dateRange += ' ' + todo.startTime + '-';
+        else if (!todo.isAllDay) dateRange += ' (未指定時間)';
         let info = `<div><b>${todo.title}</b><br><span style="font-size:12px;color:#666;">${dateRange}`;
         if (todo.room) info += ` | ${todo.room}`;
         if (todo.employee) info += ` | ${todo.employee}`;
@@ -2203,3 +2271,28 @@ async function deleteTodo(id) {
         renderTodos();
     } catch (err) { alert('刪除失敗：' + err.message); }
 }
+
+// Inject todo marker CSS
+(function(){
+    const style = document.createElement('style');
+    style.textContent = `
+        .todo-marker {
+            display: inline-block;
+            width: 0; height: 0;
+            border-top: 4px solid transparent;
+            border-bottom: 4px solid transparent;
+            border-left: 6px solid #f9a825;
+            margin-right: 4px;
+            vertical-align: middle;
+        }
+        .event-label .todo-marker {
+            border-top: 3px solid transparent;
+            border-bottom: 3px solid transparent;
+            border-left: 5px solid #f9a825;
+        }
+        .day .event-label.todo-label {
+            opacity: 0.9;
+        }
+    `;
+    document.head.appendChild(style);
+})();

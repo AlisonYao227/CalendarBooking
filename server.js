@@ -72,12 +72,16 @@ async function initDB() {
         title TEXT NOT NULL,
         start_date TEXT NOT NULL,
         end_date TEXT NOT NULL,
+        start_time TEXT DEFAULT '',
+        end_time TEXT DEFAULT '',
         room_name TEXT DEFAULT '',
         employee TEXT DEFAULT '',
         is_all_day INTEGER DEFAULT 0,
         is_deleted INTEGER DEFAULT 0,
         create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
+    await query(`ALTER TABLE todos ADD COLUMN IF NOT EXISTS start_time TEXT DEFAULT ''`);
+    await query(`ALTER TABLE todos ADD COLUMN IF NOT EXISTS end_time TEXT DEFAULT ''`);
 
     const adminCheck = await query(`SELECT id FROM users WHERE username = 'admin'`);
     if (adminCheck.rows.length === 0) {
@@ -277,24 +281,24 @@ app.post('/api/announcement', async (req, res) => {
 // === Todos ===
 app.get('/api/todos', async (req, res) => {
     try {
-        const r = await query(`SELECT id, title, start_date as "startDate", end_date as "endDate", room_name as "room", employee, is_all_day as "isAllDay" FROM todos WHERE is_deleted=0 ORDER BY start_date`);
+        const r = await query(`SELECT id, title, start_date as "startDate", end_date as "endDate", start_time as "startTime", end_time as "endTime", room_name as "room", employee, is_all_day as "isAllDay" FROM todos WHERE is_deleted=0 ORDER BY start_date`);
         res.json({ ok: true, data: r.rows });
     } catch (err) { res.json({ ok: false, msg: err.message }); }
 });
 
 app.post('/api/todos', async (req, res) => {
-    const { title, startDate, endDate, room, employee, isAllDay } = req.body;
+    const { title, startDate, endDate, startTime, endTime, room, employee, isAllDay } = req.body;
     if (!title || !startDate || !endDate) return res.json({ ok: false, msg: "標題、開始日期、結束日期為必填" });
     try {
-        const r = await query(`INSERT INTO todos (title,start_date,end_date,room_name,employee,is_all_day) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`, [title, startDate, endDate, room||'', employee||'', isAllDay ? 1 : 0]);
+        const r = await query(`INSERT INTO todos (title,start_date,end_date,start_time,end_time,room_name,employee,is_all_day) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`, [title, startDate, endDate, startTime||'', endTime||'', room||'', employee||'', isAllDay ? 1 : 0]);
         res.json({ ok: true, data: { id: r.rows[0].id } });
     } catch (err) { res.json({ ok: false, msg: err.message }); }
 });
 
 app.put('/api/todos/:id', async (req, res) => {
-    const { title, startDate, endDate, room, employee, isAllDay } = req.body;
+    const { title, startDate, endDate, startTime, endTime, room, employee, isAllDay } = req.body;
     try {
-        const r = await query(`UPDATE todos SET title=$1,start_date=$2,end_date=$3,room_name=$4,employee=$5,is_all_day=$6 WHERE id=$7 AND is_deleted=0 RETURNING id`, [title, startDate, endDate, room||'', employee||'', isAllDay ? 1 : 0, req.params.id]);
+        const r = await query(`UPDATE todos SET title=$1,start_date=$2,end_date=$3,start_time=$4,end_time=$5,room_name=$6,employee=$7,is_all_day=$8 WHERE id=$9 AND is_deleted=0 RETURNING id`, [title, startDate, endDate, startTime||'', endTime||'', room||'', employee||'', isAllDay ? 1 : 0, req.params.id]);
         if (r.rows.length === 0) return res.json({ ok: false, msg: "找不到" });
         res.json({ ok: true });
     } catch (err) { res.json({ ok: false, msg: err.message }); }

@@ -1037,7 +1037,9 @@ document.querySelectorAll('.short-input').forEach(input=>{
     }
 
     if (addTodoBtn) {
+        let todoBusy = false;
         addTodoBtn.onclick = async () => {
+            if (todoBusy) return;
             const title = document.getElementById('todoTitle').value.trim();
             const startDate = document.getElementById('todoStartDate').value;
             const endDate = document.getElementById('todoEndDate').value;
@@ -1049,45 +1051,51 @@ document.querySelectorAll('.short-input').forEach(input=>{
             if (!title || !startDate || !endDate) return alert('請填寫標題和日期');
             if (endDate < startDate) return alert('結束日期不能早於開始日期');
 
-            // Collect selected weekdays
-            const selectedDays = Array.from(document.querySelectorAll('.todo-dow:checked')).map(cb => parseInt(cb.value));
+            todoBusy = true;
+            addTodoBtn.disabled = true;
+            addTodoBtn.textContent = '新增中...';
 
-            if (selectedDays.length === 0) {
-                // No weekdays selected — create single todo
-                try {
+            try {
+                // Collect selected weekdays
+                const selectedDays = Array.from(document.querySelectorAll('.todo-dow:checked')).map(cb => parseInt(cb.value));
+
+                if (selectedDays.length === 0) {
                     const res = await fetch(`${API_BASE}/todos`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ title, startDate, endDate, startTime, endTime, room, employee, isAllDay })
                     });
                     const result = await res.json();
-                    if (!result.ok) return alert(result.msg);
-                } catch (err) { return alert('新增失敗：' + err.message); }
-            } else {
-                // Weekdays selected — create one todo per matching date in range
-                const start = new Date(startDate + 'T00:00:00');
-                const end = new Date(endDate + 'T00:00:00');
-                let created = 0;
-                for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                    if (selectedDays.includes(d.getDay())) {
-                        const dateStr = getFormattedDate(d);
-                        try {
+                    if (!result.ok) { alert(result.msg); return; }
+                } else {
+                    const start = new Date(startDate + 'T00:00:00');
+                    const end = new Date(endDate + 'T00:00:00');
+                    let created = 0;
+                    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                        if (selectedDays.includes(d.getDay())) {
+                            const dateStr = getFormattedDate(d);
                             await fetch(`${API_BASE}/todos`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ title, startDate: dateStr, endDate: dateStr, startTime, endTime, room, employee, isAllDay })
                             });
                             created++;
-                        } catch (err) { console.error('批量新增失敗:', err); }
+                        }
                     }
+                    if (created === 0) { alert('日期範圍內沒有符合的星期幾'); return; }
                 }
-                if (created === 0) return alert('日期範圍內沒有符合的星期幾');
-            }
 
-            document.getElementById('todoTitle').value = '';
-            document.querySelectorAll('.todo-dow').forEach(cb => cb.checked = false);
-            await loadTodos();
-            renderTodos();
+                document.getElementById('todoTitle').value = '';
+                document.querySelectorAll('.todo-dow').forEach(cb => cb.checked = false);
+                await loadTodos();
+                renderTodos();
+                updateView();
+            } catch (err) { alert('新增失敗：' + err.message); }
+            finally {
+                todoBusy = false;
+                addTodoBtn.disabled = false;
+                addTodoBtn.textContent = '新增代辦事項';
+            }
         };
     }
 });
@@ -1248,7 +1256,7 @@ function renderMonthView() {
                 if (timeStr && todo.endTime) timeStr += '-' + todo.endTime;
                 let dispRoom = todo.room ? getRoomDisplayText(todo.room) : '';
                 const empStr = todo.employee ? todo.employee : '';
-                evEl.innerHTML = `<span class="todo-marker"></span><strong>${timeStr}</strong> ${todo.name}` + (dispRoom ? `｜${dispRoom}` : '') + (empStr ? ` (${empStr})` : '');
+                evEl.innerHTML = `<span class="todo-marker"></span><strong>${timeStr}</strong> ${todo.title}` + (dispRoom ? `｜${dispRoom}` : '') + (empStr ? ` (${empStr})` : '');
                 evEl.style.cssText = `
                     background-color: #fff8e1;
                     color: #5d4037;
@@ -1265,7 +1273,7 @@ function renderMonthView() {
                 `;
                 evEl.onclick = (e) => {
                     e.stopPropagation();
-                    alert(`代辦事項：${todo.name}\n日期：${todo.startDate}${todo.endDate !== todo.startDate ? ' ~ ' + todo.endDate : ''}\n${timeStr ? '時間：' + timeStr + '\n' : ''}${todo.room ? '房間：' + todo.room + '\n' : ''}${todo.employee ? '負責人：' + todo.employee : ''}`);
+                    alert(`代辦事項：${todo.title}\n日期：${todo.startDate}${todo.endDate !== todo.startDate ? ' ~ ' + todo.endDate : ''}\n${timeStr ? '時間：' + timeStr + '\n' : ''}${todo.room ? '房間：' + todo.room + '\n' : ''}${todo.employee ? '負責人：' + todo.employee : ''}`);
                 };
                 dayDiv.appendChild(evEl);
             }

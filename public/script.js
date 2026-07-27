@@ -1001,6 +1001,24 @@ document.querySelectorAll('.short-input').forEach(input=>{
     }
 }
 
+function populateTodoDropdowns() {
+    const todoRoom = document.getElementById('todoRoom');
+    const todoEmployee = document.getElementById('todoEmployee');
+    if (!todoRoom || !todoEmployee) return;
+    todoRoom.innerHTML = '<option value="">不指定</option>';
+    todoEmployee.innerHTML = '<option value="">不指定</option>';
+    roomList.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.name; opt.textContent = r.name;
+        todoRoom.appendChild(opt);
+    });
+    empList.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e.name; opt.textContent = e.name;
+        todoEmployee.appendChild(opt);
+    });
+}
+
     // === Todos Button ===
     const todosBtn = document.getElementById('todosBtn');
     const todosModal = document.getElementById('todosModal');
@@ -1008,24 +1026,10 @@ document.querySelectorAll('.short-input').forEach(input=>{
 
     if (todosBtn) {
         todosBtn.onclick = async () => {
-            const todoRoom = document.getElementById('todoRoom');
-            const todoEmployee = document.getElementById('todoEmployee');
-            todoRoom.innerHTML = '<option value="">不指定</option>';
-            todoEmployee.innerHTML = '<option value="">不指定</option>';
-            roomList.forEach(r => {
-                const opt = document.createElement('option');
-                opt.value = r.name; opt.textContent = r.name;
-                todoRoom.appendChild(opt);
-            });
-            empList.forEach(e => {
-                const opt = document.createElement('option');
-                opt.value = e.name; opt.textContent = e.name;
-                todoEmployee.appendChild(opt);
-            });
+            populateTodoDropdowns();
             document.getElementById('todoStartDate').value = getTodayStr();
             document.getElementById('todoEndDate').value = getTodayStr();
             document.getElementById('todoTitle').value = '';
-            // Reset time selects and weekday checkboxes
             document.getElementById('todoStartTime').value = '';
             document.getElementById('todoEndTime').value = '';
             document.getElementById('todoAllDay').checked = false;
@@ -2271,7 +2275,11 @@ function renderTodos() {
         if (!groups[key]) groups[key] = [];
         groups[key].push(todo);
     });
-    Object.values(groups).forEach(todos => {
+    const groupKeys = Object.keys(groups);
+    window._todoGroups = groups;
+    window._todoGroupKeys = groupKeys;
+    groupKeys.forEach((key, idx) => {
+        const todos = groups[key];
         const todo = todos[0];
         const div = document.createElement('div');
         div.className = 'list-item';
@@ -2289,21 +2297,35 @@ function renderTodos() {
         if (todo.room) info += `｜${todo.room}`;
         if (todo.employee) info += `｜${todo.employee}`;
         info += '</span></div>';
-        div.innerHTML = `
-            ${info}
-            <button class="delete-x-btn" title="刪除整批" onclick="deleteTodoGroup(${JSON.stringify(todo.title).replace(/"/g,'&quot;')}, ${JSON.stringify(todo.startTime||'').replace(/"/g,'&quot;')}, ${JSON.stringify(todo.endTime||'').replace(/"/g,'&quot;')}, ${JSON.stringify(todo.room||'').replace(/"/g,'&quot;')}, ${JSON.stringify(todo.employee||'').replace(/"/g,'&quot;')}, ${todo.isAllDay?'true':'false'})"><i class="fa-solid fa-xmark"></i></button>
-        `;
+        const btn = document.createElement('button');
+        btn.className = 'delete-x-btn';
+        btn.title = '刪除整批';
+        btn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        btn.onclick = () => deleteTodoGroupByKey(idx);
+        div.innerHTML = info;
+        div.appendChild(btn);
         wrap.appendChild(div);
     });
 }
 
-async function deleteTodoGroup(title, startTime, endTime, room, employee, isAllDay) {
-    if (!confirm(`確定刪除此批「${title}」所有代辦事項？`)) return;
+async function deleteTodoGroupByKey(idx) {
+    const key = window._todoGroupKeys[idx];
+    const todos = window._todoGroups[key];
+    if (!todos || !todos.length) return;
+    const todo = todos[0];
+    if (!confirm(`確定刪除此批「${todo.title}」所有 ${todos.length} 條代辦事項？`)) return;
     try {
         await fetch(`${API_BASE}/todos/batch-delete`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, startTime, endTime, room, employee, isAllDay })
+            body: JSON.stringify({
+                title: todo.title,
+                startTime: todo.startTime || '',
+                endTime: todo.endTime || '',
+                room: todo.room || '',
+                employee: todo.employee || '',
+                isAllDay: todo.isAllDay ? 1 : 0
+            })
         });
         await loadTodos();
         renderTodos();
@@ -2339,6 +2361,7 @@ function showTodoDetail(todo) {
 }
 
 function editTodoItem(todo) {
+    populateTodoDropdowns();
     document.getElementById('todoTitle').value = todo.title;
     document.getElementById('todoStartDate').value = todo.startDate;
     document.getElementById('todoEndDate').value = todo.endDate;
@@ -2348,7 +2371,6 @@ function editTodoItem(todo) {
     document.getElementById('todoEmployee').value = todo.employee || '';
     document.getElementById('todoAllDay').checked = todo.isAllDay;
     document.getElementById('todosModal').classList.add("active");
-    // Put into edit mode — the existing addTodoBtn handler checks editId
     const addBtn = document.getElementById('addTodoBtn');
     addBtn.textContent = '更新代辦事項';
     addBtn.dataset.editId = todo.id;

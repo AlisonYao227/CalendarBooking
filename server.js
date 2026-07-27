@@ -317,7 +317,7 @@ app.post('/api/todos/batch-delete', async (req, res) => {
     try {
         const r = await query(
             `DELETE FROM todos WHERE title=$1 AND COALESCE(start_time,'')=$2 AND COALESCE(end_time,'')=$3 AND COALESCE(room,'')=$4 AND COALESCE(employee,'')=$5 AND is_all_day=$6`,
-            [title, startTime || '', endTime || '', room || '', employee || '', isAllDay || false]
+            [title, startTime || '', endTime || '', room || '', employee || '', isAllDay ? 1 : 0]
         );
         res.json({ ok: true, deleted: r.rowCount });
     } catch (err) { res.json({ ok: false, msg: err.message }); }

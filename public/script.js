@@ -1199,13 +1199,15 @@ function changeDate(step) {
 }
 
 // --- 1. 大月曆（滑鼠hover預載日期、點擊永久鎖定）
-function renderMonthView() {
+async function renderMonthView() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     monthYear.innerText = `${months[month]} ${year}`;
     const firstDay = new Date(year, month, 1).getDay();
     const lastDate = new Date(year, month + 1, 0).getDate();
     calendarDays.innerHTML = "";
+
+    await loadHolidays(year);
 
     for (let i = 0; i < firstDay; i++) calendarDays.innerHTML += `<div class="empty"></div>`;
 
@@ -1214,7 +1216,13 @@ function renderMonthView() {
         const dayDiv = document.createElement("div");
         dayDiv.className = "day";
         if (dateStr === getTodayStr()) dayDiv.classList.add("today");
-        dayDiv.innerHTML = `<span class="day-number">${i}</span>`;
+        const holiday = isHoliday(dateStr);
+        if (holiday) {
+            dayDiv.classList.add("holiday");
+            dayDiv.innerHTML = `<span class="day-number holiday-number">${i}</span><span class="holiday-tag">${holiday.name}</span>`;
+        } else {
+            dayDiv.innerHTML = `<span class="day-number">${i}</span>`;
+        }
         
         // 滑鼠移入，自動預設為切換Day的基準日期
         dayDiv.onmouseenter = () => {
@@ -2251,6 +2259,8 @@ async function saveAnnouncement(text) {
 
 // === Todos ===
 let todosData = [];
+let holidaysData = [];
+let holidaysYearLoaded = 0;
 
 async function loadTodos() {
     try {
@@ -2258,6 +2268,22 @@ async function loadTodos() {
         const json = await res.json();
         if (json.ok) todosData = json.data;
     } catch (err) { console.error("載入代辦事項失敗:", err); }
+}
+
+async function loadHolidays(year) {
+    if (holidaysYearLoaded === year && holidaysData.length > 0) return;
+    try {
+        const res = await fetch(`${API_BASE}/holidays?year=${year}`);
+        const json = await res.json();
+        if (json.ok) {
+            holidaysData = json.data;
+            holidaysYearLoaded = year;
+        }
+    } catch (err) { console.error("載入假期失敗:", err); }
+}
+
+function isHoliday(dateStr) {
+    return holidaysData.find(h => h.date === dateStr);
 }
 
 function renderTodos() {

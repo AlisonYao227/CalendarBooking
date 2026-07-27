@@ -82,6 +82,15 @@ async function initDB() {
     )`);
     await query(`ALTER TABLE todos ADD COLUMN IF NOT EXISTS start_time TEXT DEFAULT ''`);
     await query(`ALTER TABLE todos ADD COLUMN IF NOT EXISTS end_time TEXT DEFAULT ''`);
+    await query(`CREATE TABLE IF NOT EXISTS holidays (
+        id SERIAL PRIMARY KEY,
+        holiday_date TEXT NOT NULL,
+        name TEXT NOT NULL,
+        name_en TEXT DEFAULT '',
+        year INTEGER NOT NULL,
+        create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(holiday_date)
+    )`);
 
     const adminCheck = await query(`SELECT id FROM users WHERE username = 'admin'`);
     if (adminCheck.rows.length === 0) {
@@ -330,6 +339,41 @@ app.post('/api/todos/batch-delete-by-ids', async (req, res) => {
         const r = await query(`DELETE FROM todos WHERE id = ANY($1)`, [ids]);
         res.json({ ok: true, deleted: r.rowCount });
     } catch (err) { res.json({ ok: false, msg: err.message }); }
+});
+
+// === Holidays (Nager.Date proxy + DB cache) ===
+app.get('/api/holidays', async (req, res) => {
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    try {
+        // Check DB cache first
+        const cached = await query(`SELECT holiday_date as date, name, name_en FROM holidays WHERE year = $1 ORDER BY holiday_date`, [year]);
+        if (cached.rows.length > 0) return res.json({ ok: true, data: cached.rows, source: 'cache' });
+
+        // Fetch from Nager.Date
+        const nagerRes = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/HK`);
+        if (!nagerRes.ok) throw new Error(`Nager.Date returned ${nagerRes.status}`);
+        const holidays = await nagerRes.json();
+
+        // Save to DB
+        for (const h of holidays) {
+            await query(
+                `INSERT INTO holidays (holiday_date, name, name_en, year) VALUES ($1, $2, $3, $4) ON CONFLICT (holiday_date) DO UPDATE SET name = $2, name_en = $3`,
+                [h.date, h.localName || h.name, h.name, year]
+            );
+        }
+
+        const result = await query(`SELECT holiday_date as date, name, name_en FROM holidays WHERE year = $1 ORDER BY holiday_date`, [year]);
+        res.json({ ok: true, data: result.rows, source: 'nager' });
+    } catch (err) {
+        console.error('Holidays fetch error:', err.message);
+        // Try to return whatever is in cache even if partial
+        try {
+            const fallback = await query(`SELECT holiday_date as date, name, name_en FROM holidays WHERE year = $1 ORDER BY holiday_date`, [year]);
+            res.json({ ok: true, data: fallback.rows, source: 'cache-fallback' });
+        } catch (e2) {
+            res.json({ ok: false, msg: err.message });
+        }
+    }
 });
 
 // === Logs ===

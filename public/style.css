@@ -479,3 +479,22 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   white-space: nowrap;
   display: inline-block;
 }
+
+/* Holiday styles */
+.day.holiday {
+  background-color: #fff0f0 !important;
+}
+.day.holiday .day-number.holiday-number {
+  color: #d32f2f;
+  font-weight: bold;
+}
+.holiday-tag {
+  display: block;
+  font-size: 9px;
+  color: #d32f2f;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}

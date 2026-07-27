@@ -312,6 +312,17 @@ app.delete('/api/todos/:id', async (req, res) => {
     } catch (err) { res.json({ ok: false, msg: err.message }); }
 });
 
+app.post('/api/todos/batch-delete', async (req, res) => {
+    const { title, startTime, endTime, room, employee, isAllDay } = req.body;
+    try {
+        const r = await query(
+            `DELETE FROM todos WHERE title=$1 AND COALESCE(start_time,'')=$2 AND COALESCE(end_time,'')=$3 AND COALESCE(room,'')=$4 AND COALESCE(employee,'')=$5 AND is_all_day=$6`,
+            [title, startTime || '', endTime || '', room || '', employee || '', isAllDay || false]
+        );
+        res.json({ ok: true, deleted: r.rowCount });
+    } catch (err) { res.json({ ok: false, msg: err.message }); }
+});
+
 // === Logs ===
 app.get('/api/logs', async (req, res) => {
     try {

@@ -1001,6 +1001,15 @@ document.querySelectorAll('.short-input').forEach(input=>{
     }
 }
 
+function initTodosModal() {
+    const addBtn = document.getElementById('addTodoBtn');
+    if (!addBtn) return;
+    addBtn.textContent = '新增代辦事項';
+    delete addBtn.dataset.editId;
+    addBtn.disabled = false;
+    addBtn.onclick = null; // will be re-bound below
+}
+
     // === Todos Button ===
     const todosBtn = document.getElementById('todosBtn');
     const todosModal = document.getElementById('todosModal');
@@ -1250,6 +1259,8 @@ function renderMonthView() {
         // Render todos on this day
         todosData.forEach((todo) => {
             if (todo.startDate <= dateStr && todo.endDate >= dateStr) {
+                if (filterEmployee && todo.employee !== filterEmployee) return;
+                if (filterRoom && todo.room !== filterRoom) return;
                 const evEl = document.createElement("div");
                 evEl.className = "event-label todo-label";
                 let timeStr = todo.isAllDay ? '' : (todo.startTime || '');
@@ -1273,7 +1284,7 @@ function renderMonthView() {
                 `;
                 evEl.onclick = (e) => {
                     e.stopPropagation();
-                    alert(`代辦事項：${todo.title}\n日期：${todo.startDate}${todo.endDate !== todo.startDate ? ' ~ ' + todo.endDate : ''}\n${timeStr ? '時間：' + timeStr + '\n' : ''}${todo.room ? '房間：' + todo.room + '\n' : ''}${todo.employee ? '負責人：' + todo.employee : ''}`);
+                    showTodoDetail(todo);
                 };
                 dayDiv.appendChild(evEl);
             }
@@ -2249,36 +2260,120 @@ function renderTodos() {
         wrap.innerHTML = '<div style="color:#888;text-align:center;padding:12px;">暫無代辦事項</div>';
         return;
     }
+    // Group by title+startTime+endTime+room+employee+isAllDay
+    const groups = {};
     todosData.forEach(todo => {
+        const key = [todo.title, todo.startTime||'', todo.endTime||'', todo.room||'', todo.employee||'', todo.isAllDay?'1':'0'].join('|');
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(todo);
+    });
+    Object.values(groups).forEach(todos => {
+        const todo = todos[0];
         const div = document.createElement('div');
         div.className = 'list-item';
         div.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid #eee;';
-        let dateRange = todo.startDate;
-        if (todo.endDate !== todo.startDate) dateRange += ' ~ ' + todo.endDate;
-        if (todo.startTime && todo.endTime) dateRange += ' ' + todo.startTime + '-' + todo.endTime;
-        else if (todo.startTime) dateRange += ' ' + todo.startTime + '-';
-        else if (!todo.isAllDay) dateRange += ' (未指定時間)';
-        let info = `<div><b>${todo.title}</b><br><span style="font-size:12px;color:#666;">${dateRange}`;
-        if (todo.room) info += ` | ${todo.room}`;
-        if (todo.employee) info += ` | ${todo.employee}`;
-        if (todo.isAllDay) info += ' | 全日';
+        let timeStr = todo.isAllDay ? '全日' : '';
+        if (todo.startTime && todo.endTime) timeStr = todo.startTime + '-' + todo.endTime;
+        else if (todo.startTime) timeStr = todo.startTime + '-';
+        // Collect weekday pattern
+        const dowNames = ['日','一','二','三','四','五','六'];
+        const dows = [...new Set(todos.map(t => { const d = new Date(t.startDate+'T00:00:00'); return d.getDay(); }))].sort();
+        let dowStr = dows.length > 1 ? '逢星期' + dows.map(d => dowNames[d]).join('/') : '';
+        let info = `<div><b>${todo.title}</b><br><span style="font-size:12px;color:#666;">${timeStr}`;
+        if (dowStr) info += `｜${dowStr}`;
+        if (todos.length > 1) info += `｜共${todos.length}條`;
+        if (todo.room) info += `｜${todo.room}`;
+        if (todo.employee) info += `｜${todo.employee}`;
         info += '</span></div>';
         div.innerHTML = `
             ${info}
-            <button class="delete-x-btn" title="刪除" onclick="deleteTodo(${todo.id})"><i class="fa-solid fa-xmark"></i></button>
+            <button class="delete-x-btn" title="刪除整批" onclick="deleteTodoGroup(${JSON.stringify(todo.title).replace(/"/g,'&quot;')}, ${JSON.stringify(todo.startTime||'').replace(/"/g,'&quot;')}, ${JSON.stringify(todo.endTime||'').replace(/"/g,'&quot;')}, ${JSON.stringify(todo.room||'').replace(/"/g,'&quot;')}, ${JSON.stringify(todo.employee||'').replace(/"/g,'&quot;')}, ${todo.isAllDay?'true':'false'})"><i class="fa-solid fa-xmark"></i></button>
         `;
         wrap.appendChild(div);
     });
 }
 
-async function deleteTodo(id) {
-    if (!confirm('確定刪除此代辦事項？')) return;
+async function deleteTodoGroup(title, startTime, endTime, room, employee, isAllDay) {
+    if (!confirm(`確定刪除此批「${title}」所有代辦事項？`)) return;
     try {
-        await fetch(`${API_BASE}/todos/${id}`, { method: 'DELETE' });
+        await fetch(`${API_BASE}/todos/batch-delete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, startTime, endTime, room, employee, isAllDay })
+        });
         await loadTodos();
         renderTodos();
+        updateView();
     } catch (err) { alert('刪除失敗：' + err.message); }
 }
+
+function showTodoDetail(todo) {
+    const modal = document.getElementById('todoDetailModal');
+    document.getElementById('todoDetailTitle').textContent = todo.title;
+    let dateText = todo.startDate;
+    if (todo.endDate !== todo.startDate) dateText += ' ~ ' + todo.endDate;
+    document.getElementById('todoDetailDate').textContent = '日期：' + dateText;
+    let timeText = todo.isAllDay ? '全日' : (todo.startTime || '');
+    if (timeText && todo.endTime) timeText += ' ~ ' + todo.endTime;
+    document.getElementById('todoDetailTime').textContent = todo.room ? '房間：' + todo.room : '';
+    document.getElementById('todoDetailRoom').textContent = todo.room || '';
+    document.getElementById('todoDetailEmployee').innerHTML = '負責人：<span>' + (todo.employee || '') + '</span>';
+    document.getElementById('todoDetailTime').textContent = timeText ? '時間：' + timeText : '';
+
+    document.getElementById('btnDeleteTodoDetail').onclick = async () => {
+        if (!confirm('確定刪除此代辦事項？')) return;
+        await fetch(`${API_BASE}/todos/${todo.id}`, { method: 'DELETE' });
+        modal.classList.remove("show");
+        await loadTodos(); renderTodos(); updateView();
+    };
+    document.getElementById('btnEditTodoDetail').onclick = () => {
+        modal.classList.remove("show");
+        editTodoItem(todo);
+    };
+    document.getElementById('btnCloseTodoDetail').onclick = () => modal.classList.remove("show");
+    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove("show"); };
+    modal.classList.add("show");
+}
+
+function editTodoItem(todo) {
+    document.getElementById('todoTitle').value = todo.title;
+    document.getElementById('todoStartDate').value = todo.startDate;
+    document.getElementById('todoEndDate').value = todo.endDate;
+    document.getElementById('todoStartTime').value = todo.startTime || '';
+    document.getElementById('todoEndTime').value = todo.endTime || '';
+    document.getElementById('todoRoom').value = todo.room || '';
+    document.getElementById('todoEmployee').value = todo.employee || '';
+    document.getElementById('todoAllDay').checked = todo.isAllDay;
+    document.getElementById('todosModal').classList.add("show");
+    // Change add button to update mode
+    const addBtn = document.getElementById('addTodoBtn');
+    addBtn.textContent = '更新代辦事項';
+    addBtn.dataset.editId = todo.id;
+    addBtn.onclick = async () => {
+        if (!confirm('確定更新此代辦事項？')) return;
+        await fetch(`${API_BASE}/todos/${todo.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title: document.getElementById('todoTitle').value.trim(),
+                startDate: document.getElementById('todoStartDate').value,
+                endDate: document.getElementById('todoEndDate').value,
+                startTime: document.getElementById('todoStartTime').value,
+                endTime: document.getElementById('todoEndTime').value,
+                room: document.getElementById('todoRoom').value,
+                employee: document.getElementById('todoEmployee').value,
+                isAllDay: document.getElementById('todoAllDay').checked
+            })
+        });
+        document.getElementById('todosModal').classList.remove("show");
+        addBtn.textContent = '新增代辦事項';
+        delete addBtn.dataset.editId;
+        await loadTodos(); renderTodos(); updateView();
+        initTodosModal(); // restore normal add behavior
+    };
+}
+
+// old single deleteTodo removed — now using deleteTodoGroup and detail modal
 
 // Inject todo marker CSS
 (function(){

@@ -1001,24 +1001,6 @@ document.querySelectorAll('.short-input').forEach(input=>{
     }
 }
 
-function populateTodoDropdowns() {
-    const todoRoom = document.getElementById('todoRoom');
-    const todoEmployee = document.getElementById('todoEmployee');
-    if (!todoRoom || !todoEmployee) return;
-    todoRoom.innerHTML = '<option value="">不指定</option>';
-    todoEmployee.innerHTML = '<option value="">不指定</option>';
-    if (Array.isArray(roomList)) roomList.forEach(r => {
-        const opt = document.createElement('option');
-        opt.value = r.name; opt.textContent = r.name;
-        todoRoom.appendChild(opt);
-    });
-    if (Array.isArray(empList)) empList.forEach(e => {
-        const opt = document.createElement('option');
-        opt.value = e.name; opt.textContent = e.name;
-        todoEmployee.appendChild(opt);
-    });
-}
-
     // === Todos Button ===
     const todosBtn = document.getElementById('todosBtn');
     const todosModal = document.getElementById('todosModal');
@@ -1116,6 +1098,24 @@ function populateTodoDropdowns() {
         };
     }
 });
+
+function populateTodoDropdowns() {
+    const todoRoom = document.getElementById('todoRoom');
+    const todoEmployee = document.getElementById('todoEmployee');
+    if (!todoRoom || !todoEmployee) return;
+    todoRoom.innerHTML = '<option value="">不指定</option>';
+    todoEmployee.innerHTML = '<option value="">不指定</option>';
+    if (Array.isArray(roomList)) roomList.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.name; opt.textContent = r.name;
+        todoRoom.appendChild(opt);
+    });
+    if (Array.isArray(empList)) empList.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e.name; opt.textContent = e.name;
+        todoEmployee.appendChild(opt);
+    });
+}
 
 // --- 視圖控制 ---
 function updateView() {

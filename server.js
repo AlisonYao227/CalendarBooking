@@ -323,6 +323,15 @@ app.post('/api/todos/batch-delete', async (req, res) => {
     } catch (err) { res.json({ ok: false, msg: err.message }); }
 });
 
+app.post('/api/todos/batch-delete-by-ids', async (req, res) => {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) return res.json({ ok: false, msg: "ids required" });
+    try {
+        const r = await query(`DELETE FROM todos WHERE id = ANY($1)`, [ids]);
+        res.json({ ok: true, deleted: r.rowCount });
+    } catch (err) { res.json({ ok: false, msg: err.message }); }
+});
+
 // === Logs ===
 app.get('/api/logs', async (req, res) => {
     try {

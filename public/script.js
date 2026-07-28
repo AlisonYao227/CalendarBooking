@@ -409,7 +409,7 @@ function getFilteredData() {
     importTipBtn.onclick = (e) => {
         e.stopPropagation();
         // 固定前置格式說明，每次點擊都顯示
-        let tipText = "【Excel匯入格式規範】\n支援多Sheet匯入，系統會自動偵測每個Sheet的欄位：\n\n📋 Sheet 1「預約」欄位：日期、活動名稱、預約員工、房間、開始時間、結束時間、結束日期(選填)\n📋 Sheet 2「待辦事項」欄位：標題、開始日期、結束日期、開始時間、結束時間、房間、負責人、全日\n📋 Sheet 3「公眾假期」由系統自動抓取，無需匯入\n📋 Sheet 4「員工假期」欄位：員工姓名、日期、假期類型(選填)\n\n時間格式：09:00、23:30\n日期格式：2026-01-15\n支援跨日預約（結束時間早於開始時間自動視為隔日結束）\n\n";
+        let tipText = "【Excel匯入格式規範】\n支援多Sheet匯入，系統會自動偵測每個Sheet的欄位：\n\n📋 Sheet 1「預約」欄位：日期、活動名稱、預約員工、房間、開始時間、結束時間、結束日期(選填)\n📋 Sheet 2「待辦事項」欄位：標題、開始日期、結束日期、開始時間、結束時間、房間、負責人、全日\n📋 Sheet 3「公眾假期」由系統自動抓取，無需匯入\n📋 Sheet 4「員工假期」欄位：員工姓名、開始日期、結束日期(同日=單日)、假期類型(選填)\n\n時間格式：09:00、23:30\n日期格式：2026-01-15\n支援跨日預約（結束時間早於開始時間自動視為隔日結束）\n\n";
 
         if(currentImportSkipList.length > 0){
             // 有異常：規範 + 完整錯誤清單
@@ -540,13 +540,14 @@ function getFilteredData() {
                     } else if (headers.includes('名稱') && headers.includes('日期') && !headers.includes('活動名稱')) {
                         totalSkip++; allSkipList.push(`[假期]假期資料由系統自動抓取，無需匯入`);
 
-                    } else if (headers.includes('員工姓名') && headers.includes('日期')) {
+                    } else if (headers.includes('員工姓名') && (headers.includes('日期') || headers.includes('開始日期'))) {
                         // === EMPLOYEE LEAVE SHEET ===
                         const headerMap = {};
                         headerRow.forEach((h, i) => {
                             const key = String(h || '').trim();
                             if (key === '員工姓名' || key === '員工') headerMap.employee = i;
-                            else if (key === '日期') headerMap.leaveDate = i;
+                            else if (key === '開始日期' || key === '日期') headerMap.leaveDate = i;
+                            else if (key === '結束日期' || key === 'endDate') headerMap.endDate = i;
                             else if (key === '假期類型' || key === '類型') headerMap.leaveType = i;
                         });
                         const leaveList = [];
@@ -556,12 +557,14 @@ function getFilteredData() {
                             const employee = get('employee'); const leaveDateRaw = get('leaveDate');
                             if (!employee || !leaveDateRaw) { totalSkip++; allSkipList.push(`[員工假期]缺少員工或日期`); continue; }
                             const leaveDate = excelDateToStr(leaveDateRaw);
+                            const endDateRaw = get('endDate');
+                            const endDate = endDateRaw ? excelDateToStr(endDateRaw) : leaveDate;
                             const leaveType = get('leaveType') ? String(get('leaveType')).trim() : '';
                             const empName = String(employee).trim();
                             if (!empList.some(e => e.name === empName) && !allNewEmps.has(empName)) { allNewEmps.add(empName); newEmpCount++; }
-                            const isDuplicate = leavesData.some(l => l.employee === empName && l.leaveDate === leaveDate);
-                            if (isDuplicate) { totalSkip++; allSkipList.push(`[員工假期]${empName} ${leaveDate} 已存在，跳過`); continue; }
-                            leaveList.push({ employee: empName, leaveDate, leaveType });
+                            const isDuplicate = leavesData.some(l => l.employee === empName && l.leaveDate === leaveDate && (l.endDate || l.leaveDate) === endDate);
+                            if (isDuplicate) { totalSkip++; allSkipList.push(`[員工假期]${empName} ${leaveDate}${endDate !== leaveDate ? ' ~ '+endDate : ''} 已存在，跳過`); continue; }
+                            leaveList.push({ employee: empName, leaveDate, endDate, leaveType });
                             totalSuccess++;
                         }
                         if (leaveList.length > 0) {
@@ -1004,7 +1007,8 @@ document.querySelectorAll('.short-input').forEach(input=>{
             await loadLeaves();
             if (window._renderLeaves) window._renderLeaves();
             if (window._populateLeaveEmployeeDropdown) window._populateLeaveEmployeeDropdown();
-            document.getElementById('leaveDate').value = getTodayStr();
+            document.getElementById('leaveStartDate').value = getTodayStr();
+            document.getElementById('leaveEndDate').value = getTodayStr();
             todosModal.classList.add('active');
         };
     }
@@ -1300,7 +1304,9 @@ async function renderMonthView() {
             const evEl = document.createElement("div");
             evEl.className = "event-label leave-label";
             const leaveTypeStr = leave.leaveType ? ` (${leave.leaveType})` : '';
-            evEl.innerHTML = `<span class="leave-marker">🌴</span>${leave.employee}${leaveTypeStr}`;
+            const isStart = leave.leaveDate === dateStr;
+            const prefix = isStart ? '' : '[跨日] ';
+            evEl.innerHTML = `<span class="leave-marker">🌴</span>${prefix}${leave.employee}${leaveTypeStr}`;
             evEl.style.cssText = `
                 background-color: #e8f5e9;
                 color: #2e7d32;
@@ -1924,10 +1930,10 @@ function exportExcel(range){
     XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(holidayData), "公眾假期");
 
     // Sheet 4: 員工假期
-    const leaveData = [["員工姓名","日期","假期類型"]];
+    const leaveData = [["員工姓名","開始日期","結束日期","假期類型"]];
     const filteredLeaves = getFilteredLeaves(range);
     filteredLeaves.forEach(l=>{
-        leaveData.push([l.employee, l.leaveDate, l.leaveType||''])
+        leaveData.push([l.employee, l.leaveDate, l.endDate || l.leaveDate, l.leaveType||''])
     })
     XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(leaveData), "員工假期");
 
@@ -1991,11 +1997,14 @@ function getFilteredLeaves(range){
         list = list.filter(l => {
             const ly = parseInt(l.leaveDate.split("-")[0]);
             const lm = parseInt(l.leaveDate.split("-")[1]) - 1;
-            return ly === year && lm === month;
+            const endD = l.endDate || l.leaveDate;
+            const ey = parseInt(endD.split("-")[0]);
+            const em = parseInt(endD.split("-")[1]) - 1;
+            return (ly === year && lm === month) || (ey === year && em === month) || (ly < year || (ly === year && lm < month)) && (ey > year || (ey === year && em > month));
         });
     }else if(range === "currentDay"){
         const d = getFormattedDate(selectedCalendarDate);
-        list = list.filter(l => l.leaveDate === d);
+        list = list.filter(l => l.leaveDate <= d && (l.endDate || l.leaveDate) >= d);
     }else if(range === "currentWeek"){
         const startOfWeek = new Date(currentDate);
         startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
@@ -2003,7 +2012,7 @@ function getFilteredLeaves(range){
         endOfWeek.setDate(startOfWeek.getDate() + 6);
         const ws = getFormattedDate(startOfWeek);
         const we = getFormattedDate(endOfWeek);
-        list = list.filter(l => l.leaveDate >= ws && l.leaveDate <= we);
+        list = list.filter(l => l.leaveDate <= we && (l.endDate || l.leaveDate) >= ws);
     }
     if(filterEmployee) list = list.filter(l => l.employee === filterEmployee);
     return list;
@@ -2396,11 +2405,11 @@ function isHoliday(dateStr) {
 }
 
 function isLeave(dateStr, employee) {
-    return leavesData.find(l => l.leaveDate === dateStr && l.employee === employee);
+    return leavesData.find(l => l.employee === employee && l.leaveDate <= dateStr && (l.endDate || l.leaveDate) >= dateStr);
 }
 
 function getLeavesForDate(dateStr) {
-    return leavesData.filter(l => l.leaveDate === dateStr);
+    return leavesData.filter(l => l.leaveDate <= dateStr && (l.endDate || l.leaveDate) >= dateStr);
 }
 
 async function loadLeaves() {
@@ -2581,19 +2590,23 @@ function editTodoItem(todo) {
     if (addLeaveBtn) {
         addLeaveBtn.onclick = async () => {
             const employee = document.getElementById('leaveEmployee').value;
-            const leaveDate = document.getElementById('leaveDate').value;
+            const leaveDate = document.getElementById('leaveStartDate').value;
+            const endDate = document.getElementById('leaveEndDate').value;
             const leaveType = document.getElementById('leaveType').value;
-            if (!employee || !leaveDate) return alert('請選擇員工和日期');
+            if (!employee || !leaveDate) return alert('請選擇員工和開始日期');
+            const finalEndDate = endDate || leaveDate;
+            if (finalEndDate < leaveDate) return alert('結束日期不能早於開始日期');
             try {
                 const res = await fetch(`${API_BASE}/employee-leaves`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ employee, leaveDate, leaveType })
+                    body: JSON.stringify({ employee, leaveDate, endDate: finalEndDate, leaveType })
                 });
                 const json = await res.json();
                 if (!json.ok) return alert(json.msg);
-                document.getElementById('leaveDate').value = '';
+                document.getElementById('leaveStartDate').value = getTodayStr();
+                document.getElementById('leaveEndDate').value = getTodayStr();
                 document.getElementById('leaveType').value = '';
-                await loadLeaves(); renderLeaves(); updateView();
+                await loadLeaves(); if (window._renderLeaves) window._renderLeaves(); updateView();
             } catch (err) { alert('新增失敗：' + err.message); }
         };
     }
@@ -2612,13 +2625,15 @@ function editTodoItem(todo) {
             div.className = 'list-item';
             div.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid #eee;';
             const typeStr = leave.leaveType ? ` (${leave.leaveType})` : '';
-            div.innerHTML = `<div><span style="display:inline-block;width:18px;text-align:center;">🌴</span> <b>${leave.employee}</b> — ${leave.leaveDate}${typeStr}</div>`;
+            const dateStr = (leave.endDate && leave.endDate !== leave.leaveDate) ? `${leave.leaveDate} ~ ${leave.endDate}` : leave.leaveDate;
+            div.innerHTML = `<div><span style="display:inline-block;width:18px;text-align:center;">🌴</span> <b>${leave.employee}</b> — ${dateStr}${typeStr}</div>`;
             const btn = document.createElement('button');
             btn.className = 'delete-x-btn';
             btn.title = '刪除';
             btn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
             btn.onclick = async () => {
-                if (!confirm(`確定刪除 ${leave.employee} ${leave.leaveDate} 的假期記錄？`)) return;
+                const dateDisplay = (leave.endDate && leave.endDate !== leave.leaveDate) ? `${leave.leaveDate} ~ ${leave.endDate}` : leave.leaveDate;
+                if (!confirm(`確定刪除 ${leave.employee} ${dateDisplay} 的假期記錄？`)) return;
                 await fetch(`${API_BASE}/employee-leaves/${leave.id}`, { method: 'DELETE' });
                 await loadLeaves(); renderLeaves(); updateView();
             };
@@ -2634,7 +2649,8 @@ function editTodoItem(todo) {
 function showLeaveDetail(leave) {
     const modal = document.getElementById('todoDetailModal');
     document.getElementById('todoDetailTitle').textContent = '🌴 ' + leave.employee + ' 員工假期';
-    document.getElementById('todoDetailDate').textContent = '日期：' + leave.leaveDate;
+    const dateStr = (leave.endDate && leave.endDate !== leave.leaveDate) ? `${leave.leaveDate} ~ ${leave.endDate}` : leave.leaveDate;
+    document.getElementById('todoDetailDate').textContent = '日期：' + dateStr;
     document.getElementById('todoDetailTime').textContent = leave.leaveType ? '類型：' + leave.leaveType : '';
     document.getElementById('todoDetailRoom').textContent = '';
     document.getElementById('todoDetailEmployee').textContent = '';

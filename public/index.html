@@ -538,13 +538,19 @@
               <select id="leaveEmployee"><option value="">請選擇員工</option></select>
             </div>
             <div class="input-group">
-              <label>日期</label>
-              <input type="date" id="leaveDate">
+              <label>假期類型（選填）</label>
+              <input type="text" id="leaveType" placeholder="例如：年假、病假、事假">
             </div>
           </div>
-          <div class="input-group">
-            <label>假期類型（選填）</label>
-            <input type="text" id="leaveType" placeholder="例如：年假、病假、事假">
+          <div class="input-row">
+            <div class="input-group">
+              <label>開始日期</label>
+              <input type="date" id="leaveStartDate">
+            </div>
+            <div class="input-group">
+              <label>結束日期（同日=單日）</label>
+              <input type="date" id="leaveEndDate">
+            </div>
           </div>
           <button id="addLeaveBtn" class="btn-add-main" style="width:100%;margin-bottom:12px;">新增員工假期</button>
           <div id="leaveListWrap" style="max-height:300px;overflow-y:auto;"></div>

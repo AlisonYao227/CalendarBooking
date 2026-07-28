@@ -95,10 +95,12 @@ async function initDB() {
         id SERIAL PRIMARY KEY,
         employee TEXT NOT NULL,
         leave_date TEXT NOT NULL,
+        end_date TEXT DEFAULT '',
         leave_type TEXT DEFAULT '',
         is_deleted INTEGER DEFAULT 0,
         create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
+    await query(`ALTER TABLE employee_leaves ADD COLUMN IF NOT EXISTS end_date TEXT DEFAULT ''`);
 
     const adminCheck = await query(`SELECT id FROM users WHERE username = 'admin'`);
     if (adminCheck.rows.length === 0) {
@@ -387,17 +389,18 @@ app.get('/api/holidays', async (req, res) => {
 // === Employee Leaves ===
 app.get('/api/employee-leaves', async (req, res) => {
     try {
-        const r = await query(`SELECT id, employee, leave_date as "leaveDate", leave_type as "leaveType" FROM employee_leaves WHERE is_deleted=0 ORDER BY leave_date`);
+        const r = await query(`SELECT id, employee, leave_date as "leaveDate", COALESCE(end_date,'') as "endDate", leave_type as "leaveType" FROM employee_leaves WHERE is_deleted=0 ORDER BY leave_date`);
         res.json({ ok: true, data: r.rows });
     } catch (err) { res.json({ ok: false, msg: err.message }); }
 });
 
 app.post('/api/employee-leaves', async (req, res) => {
-    const { employee, leaveDate, leaveType } = req.body;
+    const { employee, leaveDate, endDate, leaveType } = req.body;
     if (!employee || !leaveDate) return res.json({ ok: false, msg: "員工姓名和日期為必填" });
+    const finalEndDate = endDate || leaveDate;
     try {
-        const r = await query(`INSERT INTO employee_leaves (employee, leave_date, leave_type) VALUES ($1,$2,$3) RETURNING id`, [employee, leaveDate, leaveType || '']);
-        await logOp('CREATE_LEAVE', r.rows[0].id, `新增假期: ${employee} ${leaveDate}`, req.ip);
+        const r = await query(`INSERT INTO employee_leaves (employee, leave_date, end_date, leave_type) VALUES ($1,$2,$3,$4) RETURNING id`, [employee, leaveDate, finalEndDate, leaveType || '']);
+        await logOp('CREATE_LEAVE', r.rows[0].id, `新增假期: ${employee} ${leaveDate}${finalEndDate !== leaveDate ? ' ~ ' + finalEndDate : ''}`, req.ip);
         res.json({ ok: true, data: { id: r.rows[0].id } });
     } catch (err) { res.json({ ok: false, msg: err.message }); }
 });
@@ -411,8 +414,9 @@ app.post('/api/employee-leaves/batch', async (req, res) => {
         if (client) await client.query('BEGIN');
         for (const item of list) {
             try {
+                const finalEndDate = item.endDate || item.leaveDate;
                 if (client) {
-                    await client.query(`INSERT INTO employee_leaves (employee, leave_date, leave_type) VALUES ($1,$2,$3)`, [item.employee, item.leaveDate, item.leaveType || '']);
+                    await client.query(`INSERT INTO employee_leaves (employee, leave_date, end_date, leave_type) VALUES ($1,$2,$3,$4)`, [item.employee, item.leaveDate, finalEndDate, item.leaveType || '']);
                 }
                 ok++;
             } catch (e) { fail++; }

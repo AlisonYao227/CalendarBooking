@@ -1306,7 +1306,7 @@ async function renderMonthView() {
             const leaveTypeStr = leave.leaveType ? ` (${leave.leaveType})` : '';
             const isStart = leave.leaveDate === dateStr;
             const prefix = isStart ? '' : '[跨日] ';
-            evEl.innerHTML = `<span class="leave-marker">🌴</span>${prefix}${leave.employee}${leaveTypeStr}`;
+            evEl.innerHTML = `<span class="leave-square"></span>${prefix}${leave.employee}${leaveTypeStr}`;
             evEl.style.cssText = `
                 background-color: #e8f5e9;
                 color: #2e7d32;
@@ -2626,7 +2626,7 @@ function editTodoItem(todo) {
             div.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid #eee;';
             const typeStr = leave.leaveType ? ` (${leave.leaveType})` : '';
             const dateStr = (leave.endDate && leave.endDate !== leave.leaveDate) ? `${leave.leaveDate} ~ ${leave.endDate}` : leave.leaveDate;
-            div.innerHTML = `<div><span style="display:inline-block;width:18px;text-align:center;">🌴</span> <b>${leave.employee}</b> — ${dateStr}${typeStr}</div>`;
+            div.innerHTML = `<div><span class="leave-square" style="margin-right:6px;"></span><b>${leave.employee}</b> — ${dateStr}${typeStr}</div>`;
             const btn = document.createElement('button');
             btn.className = 'delete-x-btn';
             btn.title = '刪除';
@@ -2648,7 +2648,7 @@ function editTodoItem(todo) {
 
 function showLeaveDetail(leave) {
     const modal = document.getElementById('todoDetailModal');
-    document.getElementById('todoDetailTitle').textContent = '🌴 ' + leave.employee + ' 員工假期';
+    document.getElementById('todoDetailTitle').textContent = leave.employee + ' 員工假期';
     const dateStr = (leave.endDate && leave.endDate !== leave.leaveDate) ? `${leave.leaveDate} ~ ${leave.endDate}` : leave.leaveDate;
     document.getElementById('todoDetailDate').textContent = '日期：' + dateStr;
     document.getElementById('todoDetailTime').textContent = leave.leaveType ? '類型：' + leave.leaveType : '';

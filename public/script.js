@@ -84,20 +84,20 @@ let filterRoom = "";
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 // 房間配色持久化存儲
 let roomColorMap = {
-  "Classroom 1": { bg: "#e3f2fd", border: "#2f70a4", label: "#2f70a4" },
-  "Classroom 2": { bg: "#f1f8e9", border: "#8bc34a", label: "#8bc34a" },
-  "VIP Room":    { bg: "#fff3e0", border: "#e1a138", label: "#e1a138" },
-  "EDS":         { bg: "#f3e5f5", border: "#a46ac3", label: "#a46ac3" }
+  "Classroom 1": { bg: "#ede7f6", border: "#673ab7", label: "#673ab7" },
+  "Classroom 2": { bg: "#e8eaf6", border: "#5c6bc0", label: "#5c6bc0" },
+  "VIP Room":    { bg: "#f3e5f5", border: "#ab47bc", label: "#ab47bc" },
+  "EDS":         { bg: "#ede7f6", border: "#7e57c2", label: "#7e57c2" }
 };
 
 // 隨機生成房間配色函數【修復版：先順序取用未使用顏色，用完才循環】
 function generateRandomRoomColor() {
   const colorPool = [
-    "#80bcec", "#9ec078", "#bfa840", "#aa6bb5", "#736940",
-    "#51a5b0", "#7657ac", "#5c66a3", "#74ccc3", "#f4805d",
-    "#5f5c84", "#71386a", "#926180", "#5f9783", "#d07171",
-    "#294051", "#251223", "#5c4b56", "#2c7b5e", "#a13434",
-    "#294c51", "#280a47", "#4f1819", "#133528", "#4b1313"
+    "#7e57c2", "#673ab7", "#5c6bc0", "#9575cd", "#7986cb",
+    "#ab47bc", "#8e24aa", "#ba68c8", "#ce93d8", "#9c27b0",
+    "#7c4dff", "#651fff", "#b388ff", "#536dfe", "#6c757d",
+    "#5c6bc0", "#3f51b5", "#7986cb", "#9fa8da", "#5c6bc0",
+    "#4a148c", "#6a1b9a", "#8e24aa", "#ab47bc", "#ce93d8"
   ];
 
   // 取出所有已經被佔用的 border 色
@@ -126,10 +126,10 @@ function generateRandomRoomColor() {
 function getRoomStyle(roomName) {
     // 固定內建房間白名單，永遠強制使用原生配色，不隨機生成
     const builtInRooms = {
-        "Classroom 1": { bg: "#e3f2fd", border: "#2f70a4", label: "#2f70a4" },
-        "Classroom 2": { bg: "#f1f8e9", border: "#8bc34a", label: "#8bc34a" },
-        "VIP Room":    { bg: "#fff3e0", border: "#e1a138", label: "#e1a138" },
-        "EDS":         { bg: "#f3e5f5", border: "#a46ac3", label: "#a46ac3" }
+        "Classroom 1": { bg: "#ede7f6", border: "#673ab7", label: "#673ab7" },
+        "Classroom 2": { bg: "#e8eaf6", border: "#5c6bc0", label: "#5c6bc0" },
+        "VIP Room":    { bg: "#f3e5f5", border: "#ab47bc", label: "#ab47bc" },
+        "EDS":         { bg: "#ede7f6", border: "#7e57c2", label: "#7e57c2" }
     };
     if(builtInRooms[roomName]){
         return builtInRooms[roomName];
@@ -168,7 +168,7 @@ function showPasswordPrompt(message){
             </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;">
                 <button id="pwdCancelBtn" style="padding:8px 18px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:13px;">取消</button>
-                <button id="pwdOkBtn" style="padding:8px 18px;border:none;border-radius:6px;background:#4a90e2;color:#fff;cursor:pointer;font-size:13px;">確定</button>
+                <button id="pwdOkBtn" style="padding:8px 18px;border:none;border-radius:6px;background:#7c5cbf;color:#fff;cursor:pointer;font-size:13px;">確定</button>
             </div>`;
         mask.appendChild(box);
         document.body.appendChild(mask);
@@ -2001,7 +2001,7 @@ function exportPdf(range){
                     dayEvents.forEach(ev => {
                         if(ey + 3 > y + cellH) return;
                         const roomStyle = getRoomStyle(ev.room);
-                        const hex = roomStyle.label || '#4a90e2';
+                        const hex = roomStyle.label || '#7c5cbf';
                         const r = parseInt(hex.slice(1,3),16);
                         const g = parseInt(hex.slice(3,5),16);
                         const b = parseInt(hex.slice(5,7),16);
@@ -2112,7 +2112,7 @@ function exportPdf(range){
                 const barH = Math.max(botY - topY, 3);
 
                 const roomStyle = getRoomStyle(ev.room);
-                const hex = roomStyle.label || '#4a90e2';
+                const hex = roomStyle.label || '#7c5cbf';
                 const r = parseInt(hex.slice(1,3),16);
                 const g = parseInt(hex.slice(3,5),16);
                 const b = parseInt(hex.slice(5,7),16);

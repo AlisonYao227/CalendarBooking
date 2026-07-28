@@ -57,6 +57,29 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   background: var(--primary-color);
   color: white;
 }
+.search-input {
+  width: 150px;
+  padding: 6px 10px 6px 26px;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  font-size: 13px;
+  outline: none;
+  background: white;
+  transition: border-color 0.2s, width 0.3s;
+}
+.search-input:focus {
+  border-color: var(--primary-color);
+  width: 200px;
+}
+.search-icon {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: #999;
+  pointer-events: none;
+}
 #monthYear {
   flex: 1;
   text-align: center;

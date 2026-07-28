@@ -80,6 +80,7 @@ let empList = [];
 // 篩選狀態
 let filterEmployee = "";
 let filterRoom = "";
+let searchQuery = "";
 
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 // 房間配色持久化存儲
@@ -365,6 +366,18 @@ function initFilterDropdowns() {
         filterRoom = e.target.value;
         updateView();
     };
+
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        let searchTimer;
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                searchQuery = e.target.value.trim().toLowerCase();
+                updateView();
+            }, 200);
+        });
+    }
 }
 
 // 取得篩選後的事件列表
@@ -372,6 +385,7 @@ function getFilteredData() {
     return eventsData.filter(ev => {
         if (filterEmployee && ev.employee !== filterEmployee) return false;
         if (filterRoom && ev.room !== filterRoom) return false;
+        if (searchQuery && !ev.name.toLowerCase().includes(searchQuery)) return false;
         return true;
     });
 }
@@ -1238,6 +1252,7 @@ async function renderMonthView() {
     // 套用篩選
     if (filterEmployee && ev.employee !== filterEmployee) return;
     if (filterRoom && ev.room !== filterRoom) return;
+    if (searchQuery && !ev.name.toLowerCase().includes(searchQuery)) return;
     const evEl = document.createElement("div");
     evEl.className = "event-label";
     const style = getRoomStyle(ev.room);
@@ -1380,6 +1395,7 @@ function renderEventsIntoColumn(columnElement, dateStr) {
         if (!isOnStart && !isOnEnd) return false;
         if (filterEmployee && ev.employee !== filterEmployee) return false;
         if (filterRoom && ev.room !== filterRoom) return false;
+        if (searchQuery && !ev.name.toLowerCase().includes(searchQuery)) return false;
         return true;
     });
     const timeGroup = {};
@@ -1873,6 +1889,7 @@ function getFilterEvents(range){
     // 套用員工/房間篩選
     if (filterEmployee) list = list.filter(ev => ev.employee === filterEmployee);
     if (filterRoom) list = list.filter(ev => ev.room === filterRoom);
+    if (searchQuery) list = list.filter(ev => ev.name.toLowerCase().includes(searchQuery));
     list.sort((a,b)=>{
         const d1 = a.date + " " + a.startTime;
         const d2 = b.date + " " + b.startTime;

@@ -6,9 +6,9 @@
   --day-today-bg: #dceeff;
 }
 
-body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding: 10px 16px; }
+body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding: 10px 10px; }
 
-.main-container { max-width: 1400px; margin: 0 auto; background: #fff; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); overflow: hidden; }
+.main-container { max-width: 1100px; margin: 0 auto; background: #fff; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); overflow: hidden; }
 
 *{
   box-sizing: border-box;
@@ -18,7 +18,7 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 .calendar-header { 
   display: flex; 
   flex-direction: column;
-  padding: 12px 16px; 
+  padding: 12px 12px; 
   border-bottom: 1px solid var(--border-color); 
   background-color: #ece5f5;
   gap: 8px;
@@ -28,7 +28,7 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   display: flex;
   align-items: center;
   gap: 10px;
-  max-width: 1400px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 #prevbtn, #nextbtn {

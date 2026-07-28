@@ -377,30 +377,32 @@ function initFilterDropdowns() {
     const searchNext = document.getElementById('searchNext');
     if (searchInput) {
         let searchTimer;
-        function triggerSearch() {
-            clearTimeout(searchTimer);
+        function doSearch() {
             searchQuery = searchInput.value.trim().toLowerCase();
-            updateView();
+            highlightSearchMatches();
         }
         searchInput.addEventListener('input', () => {
             clearTimeout(searchTimer);
-            searchTimer = setTimeout(triggerSearch, 150);
+            searchTimer = setTimeout(doSearch, 100);
         });
         searchInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                triggerSearch();
+                clearTimeout(searchTimer);
+                doSearch();
                 searchNav(e.shiftKey ? -1 : 1);
             }
             if (e.key === 'Escape') {
-                searchInput.value = ''; searchQuery = ''; triggerSearch();
+                searchInput.value = '';
+                doSearch();
             }
         });
         if (searchPrev) searchPrev.onclick = () => searchNav(-1);
         if (searchNext) searchNext.onclick = () => searchNav(1);
         const searchClear = document.getElementById('searchClear');
         if (searchClear) searchClear.onclick = () => {
-            searchInput.value = ''; searchQuery = ''; triggerSearch();
+            searchInput.value = '';
+            doSearch();
         };
     }
 })();

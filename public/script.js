@@ -377,22 +377,30 @@ function initFilterDropdowns() {
     const searchNext = document.getElementById('searchNext');
     if (searchInput) {
         let searchTimer;
-        searchInput.addEventListener('input', (e) => {
+        function triggerSearch() {
             clearTimeout(searchTimer);
-            searchTimer = setTimeout(() => {
-                searchQuery = e.target.value.trim().toLowerCase();
-                updateView();
-            }, 200);
+            searchQuery = searchInput.value.trim().toLowerCase();
+            updateView();
+        }
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(triggerSearch, 150);
         });
         searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); e.shiftKey ? searchNav(-1) : searchNav(1); }
-            if (e.key === 'Escape') { searchInput.value = ''; searchQuery = ''; updateView(); }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                triggerSearch();
+                searchNav(e.shiftKey ? -1 : 1);
+            }
+            if (e.key === 'Escape') {
+                searchInput.value = ''; searchQuery = ''; triggerSearch();
+            }
         });
         if (searchPrev) searchPrev.onclick = () => searchNav(-1);
         if (searchNext) searchNext.onclick = () => searchNav(1);
         const searchClear = document.getElementById('searchClear');
         if (searchClear) searchClear.onclick = () => {
-            searchInput.value = ''; searchQuery = ''; updateView();
+            searchInput.value = ''; searchQuery = ''; triggerSearch();
         };
     }
 })();
@@ -1230,8 +1238,10 @@ function updateView() {
 
     monthView.style.display = (view === 'month') ? 'block' : 'none';
     timelineView.style.display = (view === 'month') ? 'none' : 'block';
-    if (view === 'month') renderMonthView();
-    else renderTimelineView(view);
+    try {
+        if (view === 'month') renderMonthView();
+        else renderTimelineView(view);
+    } catch(e) { console.error("renderView error:", e); }
 
     //切換視圖自動同步匯出下拉灰化
     syncExportRangeOptionState();

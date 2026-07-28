@@ -28,7 +28,7 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   display: flex;
   align-items: center;
   gap: 10px;
-  max-width: 1200px;
+  max-width: 1000px;
   margin: 0 auto;
 }
 #prevbtn, #nextbtn {

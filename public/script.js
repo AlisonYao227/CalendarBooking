@@ -1207,7 +1207,7 @@ function populateTodoDropdowns() {
 }
 
 // --- 視圖控制 ---
-async function updateView() {
+function updateView() {
     const view = viewSelect.value;
     const optDay = document.getElementById("optDayRange");
     if (view === "day") {
@@ -1224,12 +1224,11 @@ async function updateView() {
 
     monthView.style.display = (view === 'month') ? 'block' : 'none';
     timelineView.style.display = (view === 'month') ? 'none' : 'block';
-    if (view === 'month') await renderMonthView();
+    if (view === 'month') renderMonthView();
     else renderTimelineView(view);
 
     //切換視圖自動同步匯出下拉灰化
     syncExportRangeOptionState();
-    highlightSearchMatches();
 }
 
 /**
@@ -1295,79 +1294,47 @@ async function renderMonthView() {
     monthYear.innerText = `${months[month]} ${year}`;
     const firstDay = new Date(year, month, 1).getDay();
     const lastDate = new Date(year, month + 1, 0).getDate();
-    calendarDays.innerHTML = "";
 
     await loadHolidays(year);
 
-    for (let i = 0; i < firstDay; i++) calendarDays.innerHTML += `<div class="empty"></div>`;
+    let html = '';
+    for (let i = 0; i < firstDay; i++) html += '<div class="empty"></div>';
 
     for (let i = 1; i <= lastDate; i++) {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-        const dayDiv = document.createElement("div");
-        dayDiv.className = "day";
-        if (dateStr === getTodayStr()) dayDiv.classList.add("today");
+        const isToday = dateStr === getTodayStr();
         const holiday = isHoliday(dateStr);
+        const dayClasses = ['day' + (isToday ? ' today' : '') + (holiday ? ' holiday' : '')];
+
+        let dayInner;
         if (holiday) {
-            dayDiv.classList.add("holiday");
-            dayDiv.innerHTML = `<span class="day-number holiday-number">${i}</span><span class="holiday-tag">${holiday.name}</span>`;
+            dayInner = `<span class="day-number holiday-number">${i}</span><span class="holiday-tag">${holiday.name}</span>`;
         } else {
-            dayDiv.innerHTML = `<span class="day-number">${i}</span>`;
-        }
-        
-        // 滑鼠移入，自動預設為切換Day的基準日期
-        dayDiv.onmouseenter = () => {
-            selectedCalendarDate = new Date(dateStr);
-        };
-        // 點擊格子，永久鎖定該日期
-        if(dayDiv){
-        dayDiv.onclick = () => { 
-            selectedDateStr = dateStr;
-            selectedCalendarDate = new Date(dateStr);
-            openBookingForm(dateStr);
-         };
+            dayInner = `<span class="day-number">${i}</span>`;
         }
 
+        html += `<div class="${dayClasses.join(' ')}" data-date="${dateStr}">${dayInner}`;
+
+        // reservations
         eventsData.forEach((ev, index) => {
-    const evEndDate = ev.endDate || ev.date;
-    const isOnStartDate = ev.date === dateStr;
-    const isOnEndDate = evEndDate === dateStr && evEndDate !== ev.date;
-    
-    if (!isOnStartDate && !isOnEndDate) return;
-    // 套用篩選
-    if (filterEmployee && ev.employee !== filterEmployee) return;
-    if (filterRoom && ev.room !== filterRoom) return;
-    if (searchQuery) {
-        const keywords = searchQuery.split(/\s+/).filter(Boolean);
-        const haystack = [ev.name, ev.employee, ev.room].join(' ');
-        if (!matchKeywords(haystack, keywords)) return;
-    }
-    const evEl = document.createElement("div");
-    evEl.className = "event-label";
-    const style = getRoomStyle(ev.room);
-    const dispRoom = getRoomDisplayText(ev.room);
-    const prefix = isOnEndDate ? '[跨日] ' : '';
-    // 嚴格使用反引號，順序：時間 → 名稱 → 房間
-    evEl.innerHTML = `<strong>${ev.startTime}-${ev.endTime}</strong> ${prefix}${ev.name}｜${dispRoom}`;
-    evEl.style.cssText = `
-        background-color: ${style.label};
-        color:#ffffff;
-        font-size:11px;
-        line-height:1.3;
-        padding:2px 4px;
-        border-radius:3px;
-        margin:1px 0;
-        overflow:hidden;
-        white-space:nowrap;
-        text-overflow:ellipsis;
-        cursor:pointer;
-    `;
-    evEl.onclick = (e) => {
-        e.stopPropagation();
-        showEventDetails(index);
-    };
-    dayDiv.appendChild(evEl);
-});
-        // Render todos on this day
+            const evEndDate = ev.endDate || ev.date;
+            const isOnStartDate = ev.date === dateStr;
+            const isOnEndDate = evEndDate === dateStr && evEndDate !== ev.date;
+            if (!isOnStartDate && !isOnEndDate) return;
+            if (filterEmployee && ev.employee !== filterEmployee) return;
+            if (filterRoom && ev.room !== filterRoom) return;
+            if (searchQuery) {
+                const keywords = searchQuery.split(/\s+/).filter(Boolean);
+                const haystack = [ev.name, ev.employee, ev.room].join(' ');
+                if (!matchKeywords(haystack, keywords)) return;
+            }
+            const style = getRoomStyle(ev.room);
+            const dispRoom = getRoomDisplayText(ev.room);
+            const prefix = isOnEndDate ? '[跨日] ' : '';
+            html += `<div class="event-label" data-idx="${index}" style="background-color:${style.label};color:#fff;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;"><strong>${ev.startTime}-${ev.endTime}</strong> ${prefix}${ev.name}｜${dispRoom}</div>`;
+        });
+
+        // todos
         todosData.forEach((todo) => {
             if (todo.startDate <= dateStr && todo.endDate >= dateStr) {
                 if (filterEmployee && todo.employee !== filterEmployee) return;
@@ -1377,35 +1344,15 @@ async function renderMonthView() {
                     const haystack = [todo.title, todo.employee, todo.room].join(' ');
                     if (!matchKeywords(haystack, keywords)) return;
                 }
-                const evEl = document.createElement("div");
-                evEl.className = "event-label todo-label";
                 let timeStr = todo.isAllDay ? '' : (todo.startTime || '');
                 if (timeStr && todo.endTime) timeStr += '-' + todo.endTime;
                 let dispRoom = todo.room ? getRoomDisplayText(todo.room) : '';
                 const empStr = todo.employee ? todo.employee : '';
-                evEl.innerHTML = `<span class="todo-marker"></span><strong>${timeStr}</strong> ${todo.title}` + (dispRoom ? `｜${dispRoom}` : '') + (empStr ? ` (${empStr})` : '');
-                evEl.style.cssText = `
-                    background-color: #fff8e1;
-                    color: #5d4037;
-                    font-size:11px;
-                    line-height:1.3;
-                    padding:2px 4px;
-                    border-radius:3px;
-                    margin:1px 0;
-                    overflow:hidden;
-                    white-space:nowrap;
-                    text-overflow:ellipsis;
-                    cursor:pointer;
-                    border-left:3px solid #f9a825;
-                `;
-                evEl.onclick = (e) => {
-                    e.stopPropagation();
-                    showTodoDetail(todo);
-                };
-                dayDiv.appendChild(evEl);
+                html += `<div class="event-label todo-label" data-todo-id="${todo.id}" style="background-color:#fff8e1;color:#5d4037;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;border-left:3px solid #f9a825;"><span class="todo-marker"></span><strong>${timeStr}</strong> ${todo.title}` + (dispRoom ? `｜${dispRoom}` : '') + (empStr ? ` (${empStr})` : '') + '</div>';
             }
         });
-        // Render employee leaves on this day
+
+        // leaves
         const dayLeaves = getLeavesForDate(dateStr);
         dayLeaves.forEach(leave => {
             if (filterEmployee && leave.employee !== filterEmployee) return;
@@ -1414,34 +1361,48 @@ async function renderMonthView() {
                 const haystack = [leave.employee, leave.leaveType || ''].join(' ');
                 if (!matchKeywords(haystack, keywords)) return;
             }
-            const evEl = document.createElement("div");
-            evEl.className = "event-label leave-label";
             const leaveTypeStr = leave.leaveType ? ` (${leave.leaveType})` : '';
             const isStart = leave.leaveDate === dateStr;
             const prefix = isStart ? '' : '[跨日] ';
-            evEl.innerHTML = `<span class="leave-square"></span>${prefix}${leave.employee}${leaveTypeStr}`;
-            evEl.style.cssText = `
-                background-color: #e8f5e9;
-                color: #2e7d32;
-                font-size:11px;
-                line-height:1.3;
-                padding:2px 4px;
-                border-radius:3px;
-                margin:1px 0;
-                overflow:hidden;
-                white-space:nowrap;
-                text-overflow:ellipsis;
-                cursor:pointer;
-                border-left:3px solid #4caf50;
-            `;
-            evEl.onclick = (e) => {
-                e.stopPropagation();
-                showLeaveDetail(leave);
-            };
-            dayDiv.appendChild(evEl);
+            html += `<div class="event-label leave-label" data-leave-employee="${leave.employee}" data-leave-date="${leave.leaveDate}" style="background-color:#e8f5e9;color:#2e7d32;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;border-left:3px solid #4caf50;"><span class="leave-square"></span>${prefix}${leave.employee}${leaveTypeStr}</div>`;
         });
-        calendarDays.appendChild(dayDiv);
+
+        html += '</div>';
     }
+
+    calendarDays.innerHTML = html;
+
+    // attach click handlers via delegation
+    calendarDays.querySelectorAll('.day').forEach(dayDiv => {
+        const dateStr = dayDiv.dataset.date;
+        dayDiv.onmouseenter = () => { selectedCalendarDate = new Date(dateStr); };
+        dayDiv.onclick = () => {
+            selectedDateStr = dateStr;
+            selectedCalendarDate = new Date(dateStr);
+            openBookingForm(dateStr);
+        };
+    });
+    calendarDays.querySelectorAll('.event-label:not(.todo-label):not(.leave-label)').forEach(evEl => {
+        evEl.onclick = (e) => { e.stopPropagation(); showEventDetails(parseInt(evEl.dataset.idx)); };
+    });
+    calendarDays.querySelectorAll('.todo-label').forEach(evEl => {
+        evEl.onclick = (e) => {
+            e.stopPropagation();
+            const todo = todosData.find(t => t.id === parseInt(evEl.dataset.todoId));
+            if (todo) showTodoDetail(todo);
+        };
+    });
+    calendarDays.querySelectorAll('.leave-label').forEach(evEl => {
+        evEl.onclick = (e) => {
+            e.stopPropagation();
+            const emp = evEl.dataset.leaveEmployee;
+            const ldate = evEl.dataset.leaveDate;
+            const leave = leavesData.find(l => l.employee === emp && l.leaveDate === ldate);
+            if (leave) showLeaveDetail(leave);
+        };
+    });
+
+    highlightSearchMatches();
 }
 
 // --- 2. 時間軸（Day視圖永遠渲染滑鼠hover/點擊選取的日期）

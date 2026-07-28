@@ -367,12 +367,13 @@ function initFilterDropdowns() {
         filterRoom = e.target.value;
         updateView();
     };
+}
 
+// --- Search setup (independent of filter dropdowns) ---
+(function initSearch(){
     const searchInput = document.getElementById('searchInput');
     const searchPrev = document.getElementById('searchPrev');
     const searchNext = document.getElementById('searchNext');
-    const searchCount = document.getElementById('searchCount');
-    const searchClear = document.getElementById('searchClear');
     if (searchInput) {
         let searchTimer;
         searchInput.addEventListener('input', (e) => {
@@ -380,20 +381,20 @@ function initFilterDropdowns() {
             searchTimer = setTimeout(() => {
                 searchQuery = e.target.value.trim().toLowerCase();
                 updateView();
-                highlightSearchMatches();
             }, 200);
         });
         searchInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); e.shiftKey ? searchNav(-1) : searchNav(1); }
-            if (e.key === 'Escape') { searchInput.value = ''; searchQuery = ''; updateView(); highlightSearchMatches(); }
+            if (e.key === 'Escape') { searchInput.value = ''; searchQuery = ''; updateView(); }
         });
         if (searchPrev) searchPrev.onclick = () => searchNav(-1);
         if (searchNext) searchNext.onclick = () => searchNav(1);
+        const searchClear = document.getElementById('searchClear');
         if (searchClear) searchClear.onclick = () => {
-            searchInput.value = ''; searchQuery = ''; updateView(); highlightSearchMatches();
+            searchInput.value = ''; searchQuery = ''; updateView();
         };
     }
-}
+})();
 
 let searchMatches = [];
 let searchIndex = -1;

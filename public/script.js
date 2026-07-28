@@ -80,7 +80,6 @@ let empList = [];
 // 篩選狀態
 let filterEmployee = "";
 let filterRoom = "";
-let searchQuery = "";
 
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 // 房間配色持久化存儲
@@ -370,120 +369,13 @@ function initFilterDropdowns() {
     };
 }
 
-// --- Search setup (independent of filter dropdowns) ---
-(function initSearch(){
-    const searchInput = document.getElementById('searchInput');
-    const searchPrev = document.getElementById('searchPrev');
-    const searchNext = document.getElementById('searchNext');
-    if (searchInput) {
-        let searchTimer;
-        function doSearch() {
-            searchQuery = searchInput.value.trim().toLowerCase();
-            highlightSearchMatches();
-        }
-        searchInput.addEventListener('input', () => {
-            clearTimeout(searchTimer);
-            searchTimer = setTimeout(doSearch, 100);
-        });
-        searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                clearTimeout(searchTimer);
-                doSearch();
-                searchNav(e.shiftKey ? -1 : 1);
-            }
-            if (e.key === 'Escape') {
-                searchInput.value = '';
-                doSearch();
-            }
-        });
-        if (searchPrev) searchPrev.onclick = () => searchNav(-1);
-        if (searchNext) searchNext.onclick = () => searchNav(1);
-        const searchClear = document.getElementById('searchClear');
-        if (searchClear) searchClear.onclick = () => {
-            searchInput.value = '';
-            doSearch();
-        };
-    }
-})();
 
-let searchMatches = [];
-let searchIndex = -1;
-
-function matchKeywords(text, keywords) {
-    if (!keywords.length) return true;
-    const t = text.toLowerCase();
-    return keywords.every(kw => t.includes(kw));
-}
-
-function highlightSearchMatches() {
-    searchMatches = [];
-    searchIndex = -1;
-    const countEl = document.getElementById('searchCount');
-    const prevBtn = document.getElementById('searchPrev');
-    const nextBtn = document.getElementById('searchNext');
-    const clearBtn = document.getElementById('searchClear');
-    const allLabels = document.querySelectorAll('.event-label');
-    if (!searchQuery) {
-        allLabels.forEach(el => { el.classList.remove('search-match', 'search-match-active'); el.style.display = ''; });
-        if (countEl) countEl.style.display = 'none';
-        if (prevBtn) prevBtn.style.display = 'none';
-        if (nextBtn) nextBtn.style.display = 'none';
-        if (clearBtn) clearBtn.style.display = 'none';
-        return;
-    }
-    const keywords = searchQuery.split(/\s+/).filter(Boolean);
-    allLabels.forEach(el => {
-        const haystack = (el.dataset.search || el.textContent || '').toLowerCase();
-        if (matchKeywords(haystack, keywords)) {
-            el.style.display = '';
-            el.classList.add('search-match');
-            searchMatches.push(el);
-        } else {
-            el.style.display = 'none';
-            el.classList.remove('search-match', 'search-match-active');
-        }
-    });
-    if (searchMatches.length > 0) {
-        searchIndex = 0;
-        updateSearchHighlight();
-    }
-    if (countEl) {
-        countEl.style.display = searchMatches.length > 0 ? 'inline' : 'none';
-        countEl.textContent = searchMatches.length > 0 ? `1/${searchMatches.length}` : '0';
-    }
-    if (prevBtn) prevBtn.style.display = searchMatches.length > 1 ? 'flex' : 'none';
-    if (nextBtn) nextBtn.style.display = searchMatches.length > 1 ? 'flex' : 'none';
-    if (clearBtn) clearBtn.style.display = searchQuery ? 'flex' : 'none';
-}
-
-function searchNav(dir) {
-    if (searchMatches.length === 0) return;
-    searchIndex = (searchIndex + dir + searchMatches.length) % searchMatches.length;
-    updateSearchHighlight();
-}
-
-function updateSearchHighlight() {
-    searchMatches.forEach(el => el.classList.remove('search-match-active'));
-    if (searchIndex >= 0 && searchIndex < searchMatches.length) {
-        const el = searchMatches[searchIndex];
-        el.classList.add('search-match-active');
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const countEl = document.getElementById('searchCount');
-        if (countEl) countEl.textContent = `${searchIndex + 1}/${searchMatches.length}`;
-    }
-}
 
 // 取得篩選後的事件列表
 function getFilteredData() {
-    const keywords = searchQuery ? searchQuery.split(/\s+/).filter(Boolean) : [];
     return eventsData.filter(ev => {
         if (filterEmployee && ev.employee !== filterEmployee) return false;
         if (filterRoom && ev.room !== filterRoom) return false;
-        if (keywords.length) {
-            const haystack = [ev.name, ev.employee, ev.room].join(' ');
-            if (!matchKeywords(haystack, keywords)) return false;
-        }
         return true;
     });
 }
@@ -1343,7 +1235,7 @@ function renderMonthView() {
             const style = getRoomStyle(ev.room);
             const dispRoom = getRoomDisplayText(ev.room);
             const prefix = isOnEndDate ? '[跨日] ' : '';
-            html += `<div class="event-label" data-idx="${index}" data-search="${(ev.name + ' ' + ev.employee + ' ' + ev.room).toLowerCase()}" style="background-color:${style.label};color:#fff;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;"><strong>${ev.startTime}-${ev.endTime}</strong> ${prefix}${ev.name}｜${dispRoom}</div>`;
+            html += `<div class="event-label" data-idx="${index}" style="background-color:${style.label};color:#fff;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;"><strong>${ev.startTime}-${ev.endTime}</strong> ${prefix}${ev.name}｜${dispRoom}</div>`;
         });
 
         // todos
@@ -1355,7 +1247,7 @@ function renderMonthView() {
                 if (timeStr && todo.endTime) timeStr += '-' + todo.endTime;
                 let dispRoom = todo.room ? getRoomDisplayText(todo.room) : '';
                 const empStr = todo.employee ? todo.employee : '';
-                html += `<div class="event-label todo-label" data-todo-id="${todo.id}" data-search="${(todo.title + ' ' + todo.employee + ' ' + todo.room).toLowerCase()}" style="background-color:#fff8e1;color:#5d4037;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;border-left:3px solid #f9a825;"><span class="todo-marker"></span><strong>${timeStr}</strong> ${todo.title}` + (dispRoom ? `｜${dispRoom}` : '') + (empStr ? ` (${empStr})` : '') + '</div>';
+                html += `<div class="event-label todo-label" data-todo-id="${todo.id}" style="background-color:#fff8e1;color:#5d4037;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;border-left:3px solid #f9a825;"><span class="todo-marker"></span><strong>${timeStr}</strong> ${todo.title}` + (dispRoom ? `｜${dispRoom}` : '') + (empStr ? ` (${empStr})` : '') + '</div>';
             }
         });
 
@@ -1366,7 +1258,7 @@ function renderMonthView() {
             const leaveTypeStr = leave.leaveType ? ` (${leave.leaveType})` : '';
             const isStart = leave.leaveDate === dateStr;
             const prefix = isStart ? '' : '[跨日] ';
-            html += `<div class="event-label leave-label" data-leave-employee="${leave.employee}" data-leave-date="${leave.leaveDate}" data-search="${(leave.employee + ' ' + (leave.leaveType || '')).toLowerCase()}" style="background-color:#e8f5e9;color:#2e7d32;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;border-left:3px solid #4caf50;"><span class="leave-square"></span>${prefix}${leave.employee}${leaveTypeStr}</div>`;
+            html += `<div class="event-label leave-label" data-leave-employee="${leave.employee}" data-leave-date="${leave.leaveDate}" style="background-color:#e8f5e9;color:#2e7d32;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;border-left:3px solid #4caf50;"><span class="leave-square"></span>${prefix}${leave.employee}${leaveTypeStr}</div>`;
         });
 
         html += '</div>';
@@ -1404,7 +1296,6 @@ function renderMonthView() {
         };
     });
 
-    highlightSearchMatches();
 }
 
 // --- 2. 時間軸（Day視圖永遠渲染滑鼠hover/點擊選取的日期）
@@ -1456,11 +1347,6 @@ function renderEventsIntoColumn(columnElement, dateStr) {
         if (!isOnStart && !isOnEnd) return false;
         if (filterEmployee && ev.employee !== filterEmployee) return false;
         if (filterRoom && ev.room !== filterRoom) return false;
-        if (searchQuery) {
-            const keywords = searchQuery.split(/\s+/).filter(Boolean);
-            const haystack = [ev.name, ev.employee, ev.room].join(' ');
-            if (!matchKeywords(haystack, keywords)) return false;
-        }
         return true;
     });
     const timeGroup = {};
@@ -1954,13 +1840,6 @@ function getFilterEvents(range){
     // 套用員工/房間篩選
     if (filterEmployee) list = list.filter(ev => ev.employee === filterEmployee);
     if (filterRoom) list = list.filter(ev => ev.room === filterRoom);
-    if (searchQuery) {
-        const keywords = searchQuery.split(/\s+/).filter(Boolean);
-        list = list.filter(ev => {
-            const haystack = [ev.name, ev.employee, ev.room].join(' ');
-            return matchKeywords(haystack, keywords);
-        });
-    }
     list.sort((a,b)=>{
         const d1 = a.date + " " + a.startTime;
         const d2 = b.date + " " + b.startTime;

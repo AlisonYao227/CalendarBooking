@@ -233,6 +233,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if(nextbtn){
     nextbtn.onclick = () => changeDate(1);
 }
+    const thisMonthBtn = document.getElementById('thisMonthBtn');
+    if(thisMonthBtn){
+        thisMonthBtn.onclick = () => {
+            const today = new Date();
+            currentDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            selectedCalendarDate = new Date(today);
+            updateView();
+        };
+    }
     
     // --- 修正關閉彈窗邏輯 ---
     const allCloseBtns = document.querySelectorAll('.btn-close-view');

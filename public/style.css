@@ -41,6 +41,22 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   cursor: pointer;
   font-size: 18px;
 }
+.this-month-btn {
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 16px;
+  border: 1px solid var(--primary-color);
+  background: white;
+  color: var(--primary-color);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+.this-month-btn:hover {
+  background: var(--primary-color);
+  color: white;
+}
 #monthYear {
   flex: 1;
   text-align: center;

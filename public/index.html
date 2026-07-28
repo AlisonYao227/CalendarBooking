@@ -134,10 +134,14 @@
       <option value="">全部房間</option>
     </select>
 
-    <!-- 搜尋預約 -->
-    <div style="position:relative;display:inline-block;">
-      <input type="text" id="searchInput" class="search-input" placeholder="搜尋活動名稱…" title="搜尋活動名稱">
+    <!-- 搜尋 -->
+    <div id="searchBar" class="search-bar">
       <i class="fa-solid fa-magnifying-glass search-icon"></i>
+      <input type="text" id="searchInput" class="search-input" placeholder="搜尋…" title="搜尋活動/代辦/假期/員工">
+      <span id="searchCount" class="search-count" style="display:none;">0/0</span>
+      <button id="searchPrev" class="search-nav-btn" title="上一個" style="display:none;">▲</button>
+      <button id="searchNext" class="search-nav-btn" title="下一個" style="display:none;">▼</button>
+      <button id="searchClear" class="search-clear-btn" title="清除搜尋" style="display:none;">✕</button>
     </div>
 
     <!-- 匯入Excel 按鈕+資訊提示 -->

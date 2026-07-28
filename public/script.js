@@ -325,6 +325,7 @@ async function loadAllData() {
         if (empJson.ok) empList = empJson.data;
 
         await loadTodos();
+        await loadLeaves();
 
         updateView();
         initFilterDropdowns();
@@ -368,6 +369,10 @@ function initFilterDropdowns() {
     };
 
     const searchInput = document.getElementById('searchInput');
+    const searchPrev = document.getElementById('searchPrev');
+    const searchNext = document.getElementById('searchNext');
+    const searchCount = document.getElementById('searchCount');
+    const searchClear = document.getElementById('searchClear');
     if (searchInput) {
         let searchTimer;
         searchInput.addEventListener('input', (e) => {
@@ -375,17 +380,93 @@ function initFilterDropdowns() {
             searchTimer = setTimeout(() => {
                 searchQuery = e.target.value.trim().toLowerCase();
                 updateView();
+                highlightSearchMatches();
             }, 200);
         });
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); e.shiftKey ? searchNav(-1) : searchNav(1); }
+            if (e.key === 'Escape') { searchInput.value = ''; searchQuery = ''; updateView(); highlightSearchMatches(); }
+        });
+        if (searchPrev) searchPrev.onclick = () => searchNav(-1);
+        if (searchNext) searchNext.onclick = () => searchNav(1);
+        if (searchClear) searchClear.onclick = () => {
+            searchInput.value = ''; searchQuery = ''; updateView(); highlightSearchMatches();
+        };
+    }
+}
+
+let searchMatches = [];
+let searchIndex = -1;
+
+function matchKeywords(text, keywords) {
+    if (!keywords.length) return true;
+    const t = text.toLowerCase();
+    return keywords.every(kw => t.includes(kw));
+}
+
+function highlightSearchMatches() {
+    searchMatches = [];
+    searchIndex = -1;
+    const countEl = document.getElementById('searchCount');
+    const prevBtn = document.getElementById('searchPrev');
+    const nextBtn = document.getElementById('searchNext');
+    const clearBtn = document.getElementById('searchClear');
+    if (!searchQuery) {
+        document.querySelectorAll('.search-match, .search-match-active').forEach(el => { el.classList.remove('search-match', 'search-match-active'); });
+        if (countEl) countEl.style.display = 'none';
+        if (prevBtn) prevBtn.style.display = 'none';
+        if (nextBtn) nextBtn.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = 'none';
+        return;
+    }
+    const keywords = searchQuery.split(/\s+/).filter(Boolean);
+    document.querySelectorAll('.event-label').forEach(el => {
+        const text = el.textContent || '';
+        if (matchKeywords(text, keywords)) {
+            searchMatches.push(el);
+            el.classList.add('search-match');
+        }
+    });
+    if (searchMatches.length > 0) {
+        searchIndex = 0;
+        updateSearchHighlight();
+    }
+    if (countEl) {
+        countEl.style.display = searchMatches.length > 0 ? 'inline' : 'none';
+        countEl.textContent = searchMatches.length > 0 ? `1/${searchMatches.length}` : '0';
+    }
+    if (prevBtn) prevBtn.style.display = searchMatches.length > 1 ? 'flex' : 'none';
+    if (nextBtn) nextBtn.style.display = searchMatches.length > 1 ? 'flex' : 'none';
+    if (clearBtn) clearBtn.style.display = searchQuery ? 'flex' : 'none';
+}
+
+function searchNav(dir) {
+    if (searchMatches.length === 0) return;
+    searchIndex = (searchIndex + dir + searchMatches.length) % searchMatches.length;
+    updateSearchHighlight();
+}
+
+function updateSearchHighlight() {
+    searchMatches.forEach(el => el.classList.remove('search-match-active'));
+    if (searchIndex >= 0 && searchIndex < searchMatches.length) {
+        const el = searchMatches[searchIndex];
+        el.classList.add('search-match-active');
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const countEl = document.getElementById('searchCount');
+        if (countEl) countEl.textContent = `${searchIndex + 1}/${searchMatches.length}`;
     }
 }
 
 // 取得篩選後的事件列表
 function getFilteredData() {
+    const keywords = searchQuery ? searchQuery.split(/\s+/).filter(Boolean) : [];
     return eventsData.filter(ev => {
         if (filterEmployee && ev.employee !== filterEmployee) return false;
         if (filterRoom && ev.room !== filterRoom) return false;
-        if (searchQuery && !ev.name.toLowerCase().includes(searchQuery)) return false;
+        if (keywords.length) {
+            const haystack = [ev.name, ev.employee, ev.room].join(' ');
+            if (!matchKeywords(haystack, keywords)) return false;
+        }
         return true;
     });
 }
@@ -1016,7 +1097,8 @@ document.querySelectorAll('.short-input').forEach(input=>{
             document.getElementById('todoEndTime').value = '';
             document.getElementById('todoAllDay').checked = false;
             document.querySelectorAll('.todo-dow').forEach(cb => cb.checked = false);
-            await loadTodos();
+        await loadTodos();
+        await loadLeaves();
             renderTodos();
             await loadLeaves();
             if (window._renderLeaves) window._renderLeaves();
@@ -1124,7 +1206,7 @@ function populateTodoDropdowns() {
 }
 
 // --- 視圖控制 ---
-function updateView() {
+async function updateView() {
     const view = viewSelect.value;
     const optDay = document.getElementById("optDayRange");
     if (view === "day") {
@@ -1141,11 +1223,12 @@ function updateView() {
 
     monthView.style.display = (view === 'month') ? 'block' : 'none';
     timelineView.style.display = (view === 'month') ? 'none' : 'block';
-    if (view === 'month') renderMonthView();
+    if (view === 'month') await renderMonthView();
     else renderTimelineView(view);
 
     //切換視圖自動同步匯出下拉灰化
     syncExportRangeOptionState();
+    highlightSearchMatches();
 }
 
 /**
@@ -1252,7 +1335,11 @@ async function renderMonthView() {
     // 套用篩選
     if (filterEmployee && ev.employee !== filterEmployee) return;
     if (filterRoom && ev.room !== filterRoom) return;
-    if (searchQuery && !ev.name.toLowerCase().includes(searchQuery)) return;
+    if (searchQuery) {
+        const keywords = searchQuery.split(/\s+/).filter(Boolean);
+        const haystack = [ev.name, ev.employee, ev.room].join(' ');
+        if (!matchKeywords(haystack, keywords)) return;
+    }
     const evEl = document.createElement("div");
     evEl.className = "event-label";
     const style = getRoomStyle(ev.room);
@@ -1284,6 +1371,11 @@ async function renderMonthView() {
             if (todo.startDate <= dateStr && todo.endDate >= dateStr) {
                 if (filterEmployee && todo.employee !== filterEmployee) return;
                 if (filterRoom && todo.room !== filterRoom) return;
+                if (searchQuery) {
+                    const keywords = searchQuery.split(/\s+/).filter(Boolean);
+                    const haystack = [todo.title, todo.employee, todo.room].join(' ');
+                    if (!matchKeywords(haystack, keywords)) return;
+                }
                 const evEl = document.createElement("div");
                 evEl.className = "event-label todo-label";
                 let timeStr = todo.isAllDay ? '' : (todo.startTime || '');
@@ -1316,6 +1408,11 @@ async function renderMonthView() {
         const dayLeaves = getLeavesForDate(dateStr);
         dayLeaves.forEach(leave => {
             if (filterEmployee && leave.employee !== filterEmployee) return;
+            if (searchQuery) {
+                const keywords = searchQuery.split(/\s+/).filter(Boolean);
+                const haystack = [leave.employee, leave.leaveType || ''].join(' ');
+                if (!matchKeywords(haystack, keywords)) return;
+            }
             const evEl = document.createElement("div");
             evEl.className = "event-label leave-label";
             const leaveTypeStr = leave.leaveType ? ` (${leave.leaveType})` : '';
@@ -1395,7 +1492,11 @@ function renderEventsIntoColumn(columnElement, dateStr) {
         if (!isOnStart && !isOnEnd) return false;
         if (filterEmployee && ev.employee !== filterEmployee) return false;
         if (filterRoom && ev.room !== filterRoom) return false;
-        if (searchQuery && !ev.name.toLowerCase().includes(searchQuery)) return false;
+        if (searchQuery) {
+            const keywords = searchQuery.split(/\s+/).filter(Boolean);
+            const haystack = [ev.name, ev.employee, ev.room].join(' ');
+            if (!matchKeywords(haystack, keywords)) return false;
+        }
         return true;
     });
     const timeGroup = {};
@@ -1889,7 +1990,13 @@ function getFilterEvents(range){
     // 套用員工/房間篩選
     if (filterEmployee) list = list.filter(ev => ev.employee === filterEmployee);
     if (filterRoom) list = list.filter(ev => ev.room === filterRoom);
-    if (searchQuery) list = list.filter(ev => ev.name.toLowerCase().includes(searchQuery));
+    if (searchQuery) {
+        const keywords = searchQuery.split(/\s+/).filter(Boolean);
+        list = list.filter(ev => {
+            const haystack = [ev.name, ev.employee, ev.room].join(' ');
+            return matchKeywords(haystack, keywords);
+        });
+    }
     list.sort((a,b)=>{
         const d1 = a.date + " " + a.startTime;
         const d2 = b.date + " " + b.startTime;

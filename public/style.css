@@ -57,28 +57,88 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   background: var(--primary-color);
   color: white;
 }
-.search-input {
-  width: 150px;
-  padding: 6px 10px 6px 26px;
+.search-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 1px solid var(--border-color);
   border-radius: 16px;
-  font-size: 13px;
-  outline: none;
   background: white;
-  transition: border-color 0.2s, width 0.3s;
+  padding: 0 8px;
+  height: 32px;
+  flex: 0 1 220px;
+  min-width: 100px;
+  transition: border-color 0.2s, flex 0.3s;
 }
-.search-input:focus {
+.search-bar:focus-within {
   border-color: var(--primary-color);
-  width: 200px;
+  flex: 0 1 320px;
 }
-.search-icon {
-  position: absolute;
-  left: 9px;
-  top: 50%;
-  transform: translateY(-50%);
+.search-bar .search-icon {
   font-size: 12px;
   color: #999;
-  pointer-events: none;
+  flex-shrink: 0;
+}
+.search-bar .search-input {
+  border: none;
+  outline: none;
+  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  padding: 4px 0;
+}
+.search-count {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.search-nav-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 10px;
+  color: #666;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.search-nav-btn:hover {
+  background: #f0ecf8;
+  color: var(--primary-color);
+}
+.search-clear-btn {
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: #999;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.search-clear-btn:hover {
+  background: #f0ecf8;
+  color: #c0392b;
+}
+.search-match {
+  outline: 2px solid #f9a825;
+  outline-offset: -1px;
+}
+.search-match-active {
+  outline: 2px solid #e65100;
+  outline-offset: -1px;
+  box-shadow: 0 0 0 2px rgba(230, 81, 0, 0.3);
 }
 #monthYear {
   flex: 1;

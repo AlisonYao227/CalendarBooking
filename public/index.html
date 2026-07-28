@@ -444,6 +444,12 @@
         </div>
       </div>
       <div class="add-event-body">
+        <div class="todo-tabs" style="display:flex;gap:0;margin-bottom:12px;border-bottom:2px solid #eee;">
+          <button class="todo-tab active" data-tab="todos" style="flex:1;padding:8px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;color:var(--primary-color);border-bottom:2px solid var(--primary-color);margin-bottom:-2px;">代辦事項</button>
+          <button class="todo-tab" data-tab="leaves" style="flex:1;padding:8px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;color:#888;border-bottom:2px solid transparent;margin-bottom:-2px;">員工假期</button>
+        </div>
+        <!-- 代辦事項 Tab -->
+        <div id="tabTodos">
         <div class="input-group">
           <label>代辦事項名稱</label>
           <input type="text" id="todoTitle" placeholder="例如：佈置房間">
@@ -523,6 +529,26 @@
         </div>
         <button id="addTodoBtn" class="btn-add-main" style="width:100%;margin-bottom:12px;">新增代辦事項</button>
         <div id="todoListWrap" style="max-height:300px;overflow-y:auto;"></div>
+        </div>
+        <!-- 員工假期 Tab -->
+        <div id="tabLeaves" style="display:none;">
+          <div class="input-row">
+            <div class="input-group">
+              <label>員工</label>
+              <select id="leaveEmployee"><option value="">請選擇員工</option></select>
+            </div>
+            <div class="input-group">
+              <label>日期</label>
+              <input type="date" id="leaveDate">
+            </div>
+          </div>
+          <div class="input-group">
+            <label>假期類型（選填）</label>
+            <input type="text" id="leaveType" placeholder="例如：年假、病假、事假">
+          </div>
+          <button id="addLeaveBtn" class="btn-add-main" style="width:100%;margin-bottom:12px;">新增員工假期</button>
+          <div id="leaveListWrap" style="max-height:300px;overflow-y:auto;"></div>
+        </div>
       </div>
     </div>
   </div>

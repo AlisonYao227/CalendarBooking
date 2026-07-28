@@ -91,6 +91,14 @@ async function initDB() {
         create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(holiday_date)
     )`);
+    await query(`CREATE TABLE IF NOT EXISTS employee_leaves (
+        id SERIAL PRIMARY KEY,
+        employee TEXT NOT NULL,
+        leave_date TEXT NOT NULL,
+        leave_type TEXT DEFAULT '',
+        is_deleted INTEGER DEFAULT 0,
+        create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
 
     const adminCheck = await query(`SELECT id FROM users WHERE username = 'admin'`);
     if (adminCheck.rows.length === 0) {
@@ -374,6 +382,64 @@ app.get('/api/holidays', async (req, res) => {
             res.json({ ok: false, msg: err.message });
         }
     }
+});
+
+// === Employee Leaves ===
+app.get('/api/employee-leaves', async (req, res) => {
+    try {
+        const r = await query(`SELECT id, employee, leave_date as "leaveDate", leave_type as "leaveType" FROM employee_leaves WHERE is_deleted=0 ORDER BY leave_date`);
+        res.json({ ok: true, data: r.rows });
+    } catch (err) { res.json({ ok: false, msg: err.message }); }
+});
+
+app.post('/api/employee-leaves', async (req, res) => {
+    const { employee, leaveDate, leaveType } = req.body;
+    if (!employee || !leaveDate) return res.json({ ok: false, msg: "員工姓名和日期為必填" });
+    try {
+        const r = await query(`INSERT INTO employee_leaves (employee, leave_date, leave_type) VALUES ($1,$2,$3) RETURNING id`, [employee, leaveDate, leaveType || '']);
+        await logOp('CREATE_LEAVE', r.rows[0].id, `新增假期: ${employee} ${leaveDate}`, req.ip);
+        res.json({ ok: true, data: { id: r.rows[0].id } });
+    } catch (err) { res.json({ ok: false, msg: err.message }); }
+});
+
+app.post('/api/employee-leaves/batch', async (req, res) => {
+    const { list } = req.body;
+    if (!Array.isArray(list) || list.length === 0) return res.json({ ok: false, msg: "匯入清單為空" });
+    const client = pool ? await pool.connect() : null;
+    let ok = 0, fail = 0;
+    try {
+        if (client) await client.query('BEGIN');
+        for (const item of list) {
+            try {
+                if (client) {
+                    await client.query(`INSERT INTO employee_leaves (employee, leave_date, leave_type) VALUES ($1,$2,$3)`, [item.employee, item.leaveDate, item.leaveType || '']);
+                }
+                ok++;
+            } catch (e) { fail++; }
+        }
+        if (client) await client.query('COMMIT');
+        await logOp('BATCH_IMPORT_LEAVES', null, `匯入員工假期: 成功${ok} 失敗${fail}`, req.ip);
+        res.json({ ok: true, success: ok, fail });
+    } catch (err) { if (client) await client.query('ROLLBACK'); res.json({ ok: false, msg: err.message }); }
+    finally { if (client) client.release(); }
+});
+
+app.delete('/api/employee-leaves/:id', async (req, res) => {
+    try {
+        const r = await query(`UPDATE employee_leaves SET is_deleted=1 WHERE id=$1`, [req.params.id]);
+        if (r.rowCount === 0) return res.json({ ok: false, msg: "找不到" });
+        await logOp('DELETE_LEAVE', req.params.id, `刪除假期 #${req.params.id}`, req.ip);
+        res.json({ ok: true });
+    } catch (err) { res.json({ ok: false, msg: err.message }); }
+});
+
+app.post('/api/employee-leaves/batch-delete-by-ids', async (req, res) => {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) return res.json({ ok: false, msg: "ids required" });
+    try {
+        const r = await query(`UPDATE employee_leaves SET is_deleted=1 WHERE id = ANY($1)`, [ids]);
+        res.json({ ok: true, deleted: r.rowCount });
+    } catch (err) { res.json({ ok: false, msg: err.message }); }
 });
 
 // === Logs ===

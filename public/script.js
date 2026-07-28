@@ -468,6 +468,10 @@ function getFilteredData() {
                             if (headerMap.endDate !== undefined) {
                                 const rawEndDate = get('endDate');
                                 if (rawEndDate) importEndDate = excelDateToStr(rawEndDate);
+                                else if (sTime >= eTime) {
+                                    const nextDay = new Date(dateStr); nextDay.setDate(nextDay.getDate() + 1);
+                                    importEndDate = getFormattedDate(nextDay);
+                                }
                             } else if (sTime >= eTime) {
                                 const nextDay = new Date(dateStr); nextDay.setDate(nextDay.getDate() + 1);
                                 importEndDate = getFormattedDate(nextDay);

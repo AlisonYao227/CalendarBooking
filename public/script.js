@@ -326,6 +326,7 @@ async function loadAllData() {
 
         await loadTodos();
         await loadLeaves();
+        await loadHolidays(currentDate.getFullYear());
 
         updateView();
         initFilterDropdowns();
@@ -412,8 +413,9 @@ function highlightSearchMatches() {
     const prevBtn = document.getElementById('searchPrev');
     const nextBtn = document.getElementById('searchNext');
     const clearBtn = document.getElementById('searchClear');
+    const allLabels = document.querySelectorAll('.event-label');
     if (!searchQuery) {
-        document.querySelectorAll('.search-match, .search-match-active').forEach(el => { el.classList.remove('search-match', 'search-match-active'); });
+        allLabels.forEach(el => { el.classList.remove('search-match', 'search-match-active'); el.style.display = ''; });
         if (countEl) countEl.style.display = 'none';
         if (prevBtn) prevBtn.style.display = 'none';
         if (nextBtn) nextBtn.style.display = 'none';
@@ -421,11 +423,15 @@ function highlightSearchMatches() {
         return;
     }
     const keywords = searchQuery.split(/\s+/).filter(Boolean);
-    document.querySelectorAll('.event-label').forEach(el => {
-        const text = el.textContent || '';
-        if (matchKeywords(text, keywords)) {
-            searchMatches.push(el);
+    allLabels.forEach(el => {
+        const haystack = (el.dataset.search || el.textContent || '').toLowerCase();
+        if (matchKeywords(haystack, keywords)) {
+            el.style.display = '';
             el.classList.add('search-match');
+            searchMatches.push(el);
+        } else {
+            el.style.display = 'none';
+            el.classList.remove('search-match', 'search-match-active');
         }
     });
     if (searchMatches.length > 0) {
@@ -1271,7 +1277,7 @@ function syncExportRangeOptionState() {
     }
 }
 
-function changeDate(step) {
+async function changeDate(step) {
     const view = viewSelect.value;
     if (view === 'month') {
         currentDate.setMonth(currentDate.getMonth() + step);
@@ -1284,18 +1290,17 @@ function changeDate(step) {
         selectedCalendarDate.setDate(selectedCalendarDate.getDate() + step);
         currentDate = new Date(selectedCalendarDate);
     }
+    await loadHolidays(currentDate.getFullYear());
     updateView();
 }
 
 // --- 1. 大月曆（滑鼠hover預載日期、點擊永久鎖定）
-async function renderMonthView() {
+function renderMonthView() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     monthYear.innerText = `${months[month]} ${year}`;
     const firstDay = new Date(year, month, 1).getDay();
     const lastDate = new Date(year, month + 1, 0).getDate();
-
-    await loadHolidays(year);
 
     let html = '';
     for (let i = 0; i < firstDay; i++) html += '<div class="empty"></div>';
@@ -1323,15 +1328,10 @@ async function renderMonthView() {
             if (!isOnStartDate && !isOnEndDate) return;
             if (filterEmployee && ev.employee !== filterEmployee) return;
             if (filterRoom && ev.room !== filterRoom) return;
-            if (searchQuery) {
-                const keywords = searchQuery.split(/\s+/).filter(Boolean);
-                const haystack = [ev.name, ev.employee, ev.room].join(' ');
-                if (!matchKeywords(haystack, keywords)) return;
-            }
             const style = getRoomStyle(ev.room);
             const dispRoom = getRoomDisplayText(ev.room);
             const prefix = isOnEndDate ? '[跨日] ' : '';
-            html += `<div class="event-label" data-idx="${index}" style="background-color:${style.label};color:#fff;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;"><strong>${ev.startTime}-${ev.endTime}</strong> ${prefix}${ev.name}｜${dispRoom}</div>`;
+            html += `<div class="event-label" data-idx="${index}" data-search="${(ev.name + ' ' + ev.employee + ' ' + ev.room).toLowerCase()}" style="background-color:${style.label};color:#fff;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;"><strong>${ev.startTime}-${ev.endTime}</strong> ${prefix}${ev.name}｜${dispRoom}</div>`;
         });
 
         // todos
@@ -1339,16 +1339,11 @@ async function renderMonthView() {
             if (todo.startDate <= dateStr && todo.endDate >= dateStr) {
                 if (filterEmployee && todo.employee !== filterEmployee) return;
                 if (filterRoom && todo.room !== filterRoom) return;
-                if (searchQuery) {
-                    const keywords = searchQuery.split(/\s+/).filter(Boolean);
-                    const haystack = [todo.title, todo.employee, todo.room].join(' ');
-                    if (!matchKeywords(haystack, keywords)) return;
-                }
                 let timeStr = todo.isAllDay ? '' : (todo.startTime || '');
                 if (timeStr && todo.endTime) timeStr += '-' + todo.endTime;
                 let dispRoom = todo.room ? getRoomDisplayText(todo.room) : '';
                 const empStr = todo.employee ? todo.employee : '';
-                html += `<div class="event-label todo-label" data-todo-id="${todo.id}" style="background-color:#fff8e1;color:#5d4037;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;border-left:3px solid #f9a825;"><span class="todo-marker"></span><strong>${timeStr}</strong> ${todo.title}` + (dispRoom ? `｜${dispRoom}` : '') + (empStr ? ` (${empStr})` : '') + '</div>';
+                html += `<div class="event-label todo-label" data-todo-id="${todo.id}" data-search="${(todo.title + ' ' + todo.employee + ' ' + todo.room).toLowerCase()}" style="background-color:#fff8e1;color:#5d4037;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;border-left:3px solid #f9a825;"><span class="todo-marker"></span><strong>${timeStr}</strong> ${todo.title}` + (dispRoom ? `｜${dispRoom}` : '') + (empStr ? ` (${empStr})` : '') + '</div>';
             }
         });
 
@@ -1356,15 +1351,10 @@ async function renderMonthView() {
         const dayLeaves = getLeavesForDate(dateStr);
         dayLeaves.forEach(leave => {
             if (filterEmployee && leave.employee !== filterEmployee) return;
-            if (searchQuery) {
-                const keywords = searchQuery.split(/\s+/).filter(Boolean);
-                const haystack = [leave.employee, leave.leaveType || ''].join(' ');
-                if (!matchKeywords(haystack, keywords)) return;
-            }
             const leaveTypeStr = leave.leaveType ? ` (${leave.leaveType})` : '';
             const isStart = leave.leaveDate === dateStr;
             const prefix = isStart ? '' : '[跨日] ';
-            html += `<div class="event-label leave-label" data-leave-employee="${leave.employee}" data-leave-date="${leave.leaveDate}" style="background-color:#e8f5e9;color:#2e7d32;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;border-left:3px solid #4caf50;"><span class="leave-square"></span>${prefix}${leave.employee}${leaveTypeStr}</div>`;
+            html += `<div class="event-label leave-label" data-leave-employee="${leave.employee}" data-leave-date="${leave.leaveDate}" data-search="${(leave.employee + ' ' + (leave.leaveType || '')).toLowerCase()}" style="background-color:#e8f5e9;color:#2e7d32;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;border-left:3px solid #4caf50;"><span class="leave-square"></span>${prefix}${leave.employee}${leaveTypeStr}</div>`;
         });
 
         html += '</div>';

@@ -1225,7 +1225,6 @@ function renderMonthView() {
     monthYear.innerText = `${months[month]} ${year}`;
     const firstDay = new Date(year, month, 1).getDay();
     const lastDate = new Date(year, month + 1, 0).getDate();
-    console.log('[renderMonthView]', {year, month, firstDay, lastDate});
 
     let html = '';
     for (let i = 0; i < firstDay; i++) html += '<div class="empty"></div>';
@@ -1286,7 +1285,6 @@ function renderMonthView() {
     }
 
     calendarDays.innerHTML = html;
-    console.log('[renderMonthView] days in DOM:', calendarDays.children.length);
 
     // attach click handlers via delegation
     calendarDays.querySelectorAll('.day').forEach(dayDiv => {
@@ -2499,10 +2497,8 @@ function renderMiniCalendar() {
         html += `<div class="mini-cal-day other-month" data-date="${dateStr}">${i}</div>`;
     }
     daysEl.innerHTML = html;
-    console.log('[miniCal] rendered days:', daysEl.children.length, 'month:', month+1, 'year:', year);
     daysEl.querySelectorAll('.mini-cal-day[data-date]').forEach(el => {
         el.onclick = () => {
-            console.log('[miniCal] clicked', el.dataset.date);
             const d = new Date(el.dataset.date + 'T00:00:00');
             currentDate = new Date(d.getFullYear(), d.getMonth(), 1);
             selectedCalendarDate = new Date(d);

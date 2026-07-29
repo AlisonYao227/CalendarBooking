@@ -561,10 +561,12 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   gap: 0;
   max-width: 1370px;
   margin: 0 auto;
+  align-items: flex-start;
 }
 #mainViewContainer {
   flex: 0 0 1200px;
   max-width: 1200px;
+  overflow: visible;
 }
 #leftSidebar {
   width: 170px;

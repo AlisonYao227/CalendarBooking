@@ -1249,9 +1249,9 @@ function renderMonthView() {
             if (filterEmployee && ev.employee !== filterEmployee) return;
             if (filterRoom && ev.room !== filterRoom) return;
             const style = getRoomStyle(ev.room);
-            const dispRoom = getRoomDisplayText(ev.room);
+            const dispRoom = getCompactRoomText(ev.room);
             const prefix = isOnEndDate ? '[跨日] ' : '';
-            html += `<div class="event-label" data-idx="${index}" style="background-color:${style.label};color:#fff;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;width:100%;box-sizing:border-box;cursor:pointer;"><strong>${ev.startTime}-${ev.endTime}</strong> ${prefix}${ev.name}</div>`;
+            html += `<div class="event-label" data-idx="${index}" style="background-color:${style.label};color:#fff;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;width:100%;box-sizing:border-box;cursor:pointer;"><strong>${ev.startTime}-${ev.endTime}</strong> ${prefix}${ev.name} · ${dispRoom}</div>`;
         });
 
         // todos
@@ -1261,9 +1261,9 @@ function renderMonthView() {
                 if (filterRoom && todo.room !== filterRoom) return;
                 let timeStr = todo.isAllDay ? '' : (todo.startTime || '');
                 if (timeStr && todo.endTime) timeStr += '-' + todo.endTime;
-                let dispRoom = todo.room ? getRoomDisplayText(todo.room) : '';
+                let dispRoom = todo.room ? getCompactRoomText(todo.room) : '';
                 const empStr = todo.employee ? todo.employee : '';
-                html += `<div class="event-label todo-label" data-todo-id="${todo.id}" style="background-color:#fff8e1;color:#5d4037;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%;box-sizing:border-box;cursor:pointer;border-left:3px solid #f9a825;"><span class="todo-marker"></span><strong>${timeStr}</strong> ${todo.title}` + (dispRoom ? `｜${dispRoom}` : '') + (empStr ? ` (${empStr})` : '') + '</div>';
+                html += `<div class="event-label todo-label" data-todo-id="${todo.id}" style="background-color:#fff8e1;color:#5d4037;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;width:100%;box-sizing:border-box;cursor:pointer;border-left:3px solid #f9a825;"><span class="todo-marker"></span><strong>${timeStr}</strong> ${todo.title}` + (dispRoom ? ` · ${dispRoom}` : '') + (empStr ? ` (${empStr})` : '') + '</div>';
             }
         });
 
@@ -1274,7 +1274,7 @@ function renderMonthView() {
             const leaveTypeStr = leave.leaveType ? ` (${leave.leaveType})` : '';
             const isStart = leave.leaveDate === dateStr;
             const prefix = isStart ? '' : '[跨日] ';
-            html += `<div class="event-label leave-label" data-leave-employee="${leave.employee}" data-leave-date="${leave.leaveDate}" style="background-color:#e8f5e9;color:#2e7d32;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%;box-sizing:border-box;cursor:pointer;border-left:3px solid #4caf50;"><span class="leave-square"></span>${prefix}${leave.employee}${leaveTypeStr}</div>`;
+            html += `<div class="event-label leave-label" data-leave-employee="${leave.employee}" data-leave-date="${leave.leaveDate}" style="background-color:#e8f5e9;color:#2e7d32;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;width:100%;box-sizing:border-box;cursor:pointer;border-left:3px solid #4caf50;"><span class="leave-square"></span>${prefix}${leave.employee}${leaveTypeStr}</div>`;
         });
 
         html += '</div>';
@@ -2424,6 +2424,15 @@ function getRoomDisplayText(roomName){
         return found.short.trim();
     }
     return roomName;
+}
+
+// 月視圖專用：優先取簡稱，否則自動縮寫（如 Classroom 1 → C1）
+function getCompactRoomText(roomName){
+    const found = roomList.find(r => r.name === roomName);
+    if (found && found.short && found.short.trim() !== '') return found.short.trim();
+    const words = roomName.split(/\s+/).filter(Boolean);
+    if (words.length === 1 && words[0].length <= 5) return words[0];
+    return words.map(w => /^[A-Z]+$/.test(w) ? w : w.charAt(0).toUpperCase()).join('');
 }
     
 function exportPublicCalendarJson(){

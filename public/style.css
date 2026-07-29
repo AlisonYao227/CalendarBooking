@@ -86,13 +86,15 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 
 /* 讓時間軸在全螢幕下更長 */
 .timeline-container .day-view-container {
-  height: auto; /* 取消固定高度 */
+  height: auto;
   min-height: 1410px;
-  overflow-y: auto;
+  overflow-y: visible;
 }
 .timeline-container {
   max-height: 88vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  will-change: transform;
 }
 
 /* 隱藏/顯示控制 */
@@ -156,8 +158,7 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   border-right: 1px solid #ddd;
   margin-top: 0;
   flex-shrink: 0;
-  height: 1410px; /* 新增總高度 */
-  min-height: 0;
+  min-height: 1410px;
 }
 
 .time-slot-label {
@@ -178,22 +179,20 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 .day-column {
     position: relative;
     border-right: 1px solid #eee;
-    height: 1410px;
+    min-height: 1410px;
     background-image: linear-gradient(#f0f0f0 1px, transparent 1px);
     background-size: 100% 60px;
     margin-top: 0;
-    min-height: 0;
 }
 
 .event-grid {
-  flex-grow: 1; /* 只負責寬度平分，高度單獨設定 */
+  flex-grow: 1;
   position: relative;
-  height: 1410px;
+  min-height: 1410px;
   background-image: linear-gradient(to bottom, #e0e0e0 1px, transparent 1px);
   background-size: 100% 60px;
   background-attachment: local;
   margin-top: 0;
-  min-height: 0;
 }
 
 /* 讓第一個時段上方不要有重複的線 */

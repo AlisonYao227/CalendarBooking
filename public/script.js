@@ -2472,15 +2472,29 @@ function renderMiniCalendar() {
     titleEl.textContent = `${months[month]} ${year}`;
     const firstDay = new Date(year, month, 1).getDay();
     const lastDate = new Date(year, month + 1, 0).getDate();
+    const prevLastDate = new Date(year, month, 0).getDate();
     const todayStr = getTodayStr();
-    const curMonthStr = `${year}-${String(month+1).padStart(2,'0')}`;
     let html = '';
-    for (let i = 0; i < firstDay; i++) html += '<div class="mini-cal-day empty"></div>';
+    const prevMonth = month === 0 ? 11 : month - 1;
+    const prevYear = month === 0 ? year - 1 : year;
+    for (let i = firstDay - 1; i >= 0; i--) {
+        const d = prevLastDate - i;
+        const dateStr = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        html += `<div class="mini-cal-day other-month" data-date="${dateStr}">${d}</div>`;
+    }
     for (let i = 1; i <= lastDate; i++) {
         const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
         const isToday = dateStr === todayStr;
         const isSelected = dateStr === getFormattedDate(selectedCalendarDate);
         html += `<div class="mini-cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}" data-date="${dateStr}">${i}</div>`;
+    }
+    const totalCells = firstDay + lastDate;
+    const remaining = (7 - (totalCells % 7)) % 7;
+    const nextMonth = month === 11 ? 0 : month + 1;
+    const nextYear = month === 11 ? year + 1 : year;
+    for (let i = 1; i <= remaining; i++) {
+        const dateStr = `${nextYear}-${String(nextMonth + 1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+        html += `<div class="mini-cal-day other-month" data-date="${dateStr}">${i}</div>`;
     }
     daysEl.innerHTML = html;
     daysEl.querySelectorAll('.mini-cal-day[data-date]').forEach(el => {

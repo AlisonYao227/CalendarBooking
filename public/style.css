@@ -557,24 +557,25 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 
 /* ====== 左側邊欄 ====== */
 .main-layout {
-  display: flex;
-  gap: 0;
+  position: relative;
   max-width: 1370px;
   margin: 0 auto;
-  align-items: flex-start;
+  padding-left: 170px;
 }
 #mainViewContainer {
-  flex: 0 0 1200px;
-  max-width: 1200px;
-  overflow: visible;
+  width: 1200px;
 }
 #leftSidebar {
+  position: absolute;
+  left: 0;
+  top: 0;
   width: 170px;
-  flex-shrink: 0;
+  height: 100%;
   background: #fcfafd;
   border-right: 1px solid var(--border-color);
   padding: 10px 10px;
   overflow-y: auto;
+  box-sizing: border-box;
 }
 .sidebar-section {
   margin-bottom: 16px;

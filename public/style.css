@@ -560,6 +560,7 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   max-width: 1370px;
   margin: 0 auto;
   display: flow-root;
+  min-height: 800px;
 }
 #mainViewContainer {
   margin-left: 170px;

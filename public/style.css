@@ -559,13 +559,25 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 .main-layout {
   display: flex;
   justify-content: center;
-  max-width: 1470px;
+  max-width: 1570px;
   width: 100%;
   margin: 0 auto;
 }
 #mainViewContainer {
-  flex: 1 1 1300px;
-  max-width: 1300px;
+  flex: 1 1 1400px;
+  max-width: 1400px;
+  transition: max-width 0.2s;
+}
+/* 側欄收合 */
+.main-layout.collapsed #leftSidebar {
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+  border-right: none;
+}
+.main-layout.collapsed #mainViewContainer {
+  max-width: none;
+  flex: 1 1 100%;
 }
 #leftSidebar {
   width: 170px;
@@ -574,7 +586,30 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   border-right: 1px solid var(--border-color);
   padding: 10px 10px;
   box-sizing: border-box;
+  position: relative;
+  transition: width 0.2s, padding 0.2s;
 }
+.sidebar-toggle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+  padding: 0;
+  line-height: 1;
+  z-index: 10;
+  transition: background 0.15s;
+}
+.sidebar-toggle:hover { background: #f0ecf8; color: var(--primary-color); }
 .sidebar-section {
   margin-bottom: 16px;
 }

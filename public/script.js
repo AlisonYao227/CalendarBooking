@@ -334,6 +334,7 @@ async function loadAllData() {
         initFilterDropdowns();
         renderRoomChips();
         renderMiniCalendar();
+        initSidebarToggle();
     } catch (err) {
         console.error("載入後端數據失敗：", err);
     } finally {
@@ -2876,4 +2877,25 @@ function showLeaveDetail(leave) {
     document.getElementById('btnCloseTodoDetail').onclick = () => modal.classList.remove("active");
     modal.onclick = (e) => { if (e.target === modal) modal.classList.remove("active"); };
     modal.classList.add("active");
+}
+
+// ====== 側欄收合 ======
+function initSidebarToggle() {
+    const toggle = document.getElementById('sidebarToggle');
+    const layout = document.querySelector('.main-layout');
+    if (!toggle || !layout) return;
+    const STORAGE_KEY = 'sidebarCollapsed';
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved === '1') {
+        layout.classList.add('collapsed');
+        toggle.textContent = '▶';
+        toggle.title = '展開側欄';
+    }
+    toggle.onclick = () => {
+        const isCollapsed = layout.classList.toggle('collapsed');
+        toggle.textContent = isCollapsed ? '▶' : '◀';
+        toggle.title = isCollapsed ? '展開側欄' : '收合側欄';
+        localStorage.setItem(STORAGE_KEY, isCollapsed ? '1' : '0');
+        window.dispatchEvent(new Event('resize'));
+    };
 }

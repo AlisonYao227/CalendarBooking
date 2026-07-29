@@ -2501,13 +2501,16 @@ function renderMiniCalendar() {
     daysEl.querySelectorAll('.mini-cal-day[data-date]').forEach(el => {
         el.onclick = () => {
             const d = new Date(el.dataset.date + 'T00:00:00');
-            currentDate = new Date(d.getFullYear(), d.getMonth(), 1);
             selectedCalendarDate = new Date(d);
             _miniCalDate = new Date(d.getFullYear(), d.getMonth(), 1);
-            if (viewSelect.value !== 'month') {
-                viewSelect.value = 'month';
-                viewSelect.dispatchEvent(new Event('change'));
+            if (viewSelect.value === 'month') {
+                currentDate = new Date(d.getFullYear(), d.getMonth(), 1);
+                updateView();
+            } else if (viewSelect.value === 'week') {
+                currentDate = new Date(d);
+                updateView();
             } else {
+                // day view
                 updateView();
             }
         };

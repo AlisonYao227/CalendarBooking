@@ -177,12 +177,27 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 
 /* 分開寫，不要合併選擇器 */
 .day-column {
+
     position: relative;
     border-right: 1px solid #eee;
     min-height: 1410px;
     background-image: linear-gradient(#f0f0f0 1px, transparent 1px);
     background-size: 100% 60px;
     margin-top: 0;
+}
+.timeline-extras {
+  display: grid;
+  background: #fafafa;
+  border-top: 1px solid #ddd;
+  font-size: 10px;
+}
+.extras-gutter {
+  width: 60px;
+}
+.extras-cell {
+  padding: 4px 6px;
+  border-right: 1px solid #eee;
+  min-height: 20px;
 }
 
 .event-grid {

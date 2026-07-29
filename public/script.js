@@ -583,8 +583,6 @@ function getFilteredData() {
                             try { const res = await fetch(`${API_BASE}/employee-leaves/batch`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({list:leaveList}) }); const result = await res.json(); if (!result.ok) { totalSkip += leaveList.length; allSkipList.push("[員工假期]批量匯入失敗："+result.msg); } } catch(err) { totalSkip += leaveList.length; allSkipList.push("[員工假期]批量匯入失敗："+err.message); }
                         }
                     }
-                }
-
                 for (const rName of allNewRooms) { try { const color = generateRandomRoomColor(); await fetch(`${API_BASE}/rooms`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({name:rName,short:'',colorData:JSON.stringify(color)}) }); } catch(e) {} }
                 for (const eName of allNewEmps) { try { await fetch(`${API_BASE}/employees`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({name:eName}) }); } catch(e) {} }
 
@@ -602,7 +600,8 @@ function getFilteredData() {
                         : `\n\n點擊匯入旁邊「i」小按鈕可查看全部跳過異常明細`;
                 }
                 alert(resultMsg);
-                
+
+                }
             } catch (err) {
                 console.error(err);
                 alert("匯入失敗：檔案格式錯誤，請確認是標準 .xlsx 檔案");
@@ -1095,6 +1094,7 @@ document.querySelectorAll('.short-input').forEach(input=>{
                                 created++;
                             }
                         }
+
                         if (created === 0) { alert('日期範圍內沒有符合的星期幾'); return; }
                     }
                     document.getElementById('todoTitle').value = '';
@@ -1331,6 +1331,8 @@ eventGrid.classList.remove("week-mode");
         timeColumn.innerHTML += `<div class="time-slot-label">${String(h).padStart(2,'0')}:00</div>`;
     }
 
+
+
     if (type === 'day') {
         weekHeader.style.display = 'none';
         monthYear.innerText = formatDateFull(selectedCalendarDate);
@@ -1358,6 +1360,58 @@ eventGrid.classList.remove("week-mode");
             eventGrid.appendChild(col);
         }
     }
+
+    // 在時間軸下方顯示待辦事項與假期（獨立區域，不與預約橫條重疊）
+    const oldExtras = document.querySelector('.timeline-extras');
+    if (oldExtras) oldExtras.remove();
+    const extrasSection = document.createElement('div');
+    extrasSection.className = 'timeline-extras';
+    if (type === 'day') {
+        const cell = document.createElement('div');
+        cell.className = 'extras-cell';
+        cell.innerHTML = getDayExtrasHtml(getFormattedDate(selectedCalendarDate));
+        extrasSection.appendChild(cell);
+    } else {
+        extrasSection.style.gridTemplateColumns = '60px repeat(7, 1fr)';
+        const gutter = document.createElement('div');
+        gutter.className = 'extras-gutter';
+        extrasSection.appendChild(gutter);
+        const startOfWeek = new Date(currentDate);
+        startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+        for (let i = 0; i < 7; i++) {
+            const targetDate = new Date(startOfWeek);
+            targetDate.setDate(startOfWeek.getDate() + i);
+            const cell = document.createElement('div');
+            cell.className = 'extras-cell';
+            cell.innerHTML = getDayExtrasHtml(getFormattedDate(targetDate));
+            extrasSection.appendChild(cell);
+        }
+    }
+    timelineView.appendChild(extrasSection);
+
+}
+
+function getDayExtrasHtml(dateStr) {
+    const dayTodos = (todosData || []).filter(todo => {
+        if (filterEmployee && todo.employee !== filterEmployee) return false;
+        if (filterRoom && todo.room !== filterRoom) return false;
+        return todo.startDate <= dateStr && todo.endDate >= dateStr;
+    });
+    const dayLeaves = getLeavesForDate ? getLeavesForDate(dateStr).filter(l => {
+        if (filterEmployee && l.employee !== filterEmployee) return false;
+        return true;
+    }) : [];
+    if (dayTodos.length === 0 && dayLeaves.length === 0) return '';
+    let html = '';
+    dayTodos.forEach(todo => {
+        const timeStr = todo.isAllDay ? '全天' : (todo.startTime || '');
+        html += '<div style="color:#5d4037;padding:2px 0;"><span style="color:#f9a825;font-weight:bold;">&#9744;</span> ' + timeStr + ' ' + todo.title + (todo.employee ? ' (' + todo.employee + ')' : '') + '</div>';
+    });
+    dayLeaves.forEach(leave => {
+        const prefix = leave.leaveDate === dateStr ? '' : '[跨日] ';
+        html += '<div style="color:#2e7d32;padding:2px 0;"><span style="color:#4caf50;font-weight:bold;">&#9632;</span> ' + prefix + leave.employee + (leave.leaveType ? ' (' + leave.leaveType + ')' : '') + '</div>';
+    });
+    return html;
 }
 
 function renderEventsIntoColumn(columnElement, dateStr) {
@@ -1554,32 +1608,6 @@ function renderEventsIntoColumn(columnElement, dateStr) {
             }
         }
     });
-
-    // 在時間格下方顯示待辦事項和假期（簡潔文字列表）
-    const extrasContainer = document.createElement('div');
-    extrasContainer.style.cssText = 'padding: 4px 6px; font-size: 10px; line-height: 1.5; border-top: 1px solid #eee; margin-top: 4px;';
-    const dayTodos = (todosData || []).filter(todo => {
-        if (filterEmployee && todo.employee !== filterEmployee) return false;
-        if (filterRoom && todo.room !== filterRoom) return false;
-        return todo.startDate <= dateStr && todo.endDate >= dateStr;
-    });
-    const dayLeaves = getLeavesForDate ? getLeavesForDate(dateStr).filter(l => {
-        if (filterEmployee && l.employee !== filterEmployee) return false;
-        return true;
-    }) : [];
-    if (dayTodos.length > 0 || dayLeaves.length > 0) {
-        let extrasHtml = '';
-        dayTodos.forEach(todo => {
-            const timeStr = todo.isAllDay ? '全天' : (todo.startTime || '');
-            extrasHtml += `<div style="color:#5d4037;padding:1px 0;"><span style="color:#f9a825;font-weight:bold;">&#9744;</span> ${timeStr} ${todo.title}${todo.employee ? ' ('+todo.employee+')' : ''}</div>`;
-        });
-        dayLeaves.forEach(leave => {
-            const prefix = leave.leaveDate === dateStr ? '' : '[跨日] ';
-            extrasHtml += `<div style="color:#2e7d32;padding:1px 0;"><span style="color:#4caf50;font-weight:bold;">&#9632;</span> ${prefix}${leave.employee}${leave.leaveType ? ' ('+leave.leaveType+')' : ''}</div>`;
-        });
-        extrasContainer.innerHTML = extrasHtml;
-        columnElement.appendChild(extrasContainer);
-    }
 }
 
 // --- 3. 彈窗詳情邏輯

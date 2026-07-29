@@ -559,13 +559,13 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 .main-layout {
   display: flex;
   justify-content: center;
-  max-width: 1370px;
+  max-width: 1470px;
   width: 100%;
   margin: 0 auto;
 }
 #mainViewContainer {
-  flex: 1 1 1200px;
-  max-width: 1200px;
+  flex: 1 1 1300px;
+  max-width: 1300px;
 }
 #leftSidebar {
   width: 170px;

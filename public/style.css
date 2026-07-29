@@ -662,3 +662,9 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 .mini-cal-day.selected { background: var(--primary-color); color: #fff; font-weight: 600; }
 .mini-cal-day.other-month { color: #ccc; }
 .mini-cal-day.empty { cursor: default; }
+
+/* DEBUG: 2026-02-28 高亮 */
+.day[data-date="2026-02-28"] {
+  outline: 4px solid red !important;
+  background: #fffbe6 !important;
+}

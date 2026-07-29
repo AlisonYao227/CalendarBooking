@@ -2331,7 +2331,7 @@ function exportPdf(range){
                 doc.setFillColor(r, g, b);
                 const bx = margin + timeColW + evDateIdx * dayColW + 1;
                 const bw = dayColW - 2;
-                doc.roundedRect(bx, topY, bw, barH, 1, 1, 'F');
+                doc.rect(bx, topY, bw, barH, 'F');
 
                 doc.setTextColor(255, 255, 255);
                 doc.setFontSize(7);

@@ -1997,9 +1997,10 @@ function exportExcel(range){
 
     const book = XLSX.utils.book_new();
 
-    // Sheet 1: 預約
+    // Sheet 1: 預約（僅預約，不含待辦事項與員工假期）
     const resData = [["日期","活動名稱","預約員工","房間","開始時間","結束時間","結束日期"]];
     data.forEach(ev=>{
+        if (ev._type) return;
         resData.push([ev.date, ev.name, ev.employee, ev.room, ev.startTime, ev.endTime, ev.endDate || ''])
     })
     XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(resData), "預約");

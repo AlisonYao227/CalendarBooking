@@ -557,25 +557,22 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 
 /* ====== 左側邊欄 ====== */
 .main-layout {
-  position: relative;
   max-width: 1370px;
   margin: 0 auto;
-  padding-left: 170px;
+  display: flow-root;
 }
 #mainViewContainer {
+  margin-left: 170px;
   width: 1200px;
 }
 #leftSidebar {
-  position: absolute;
-  left: 0;
-  top: 0;
+  float: left;
   width: 170px;
-  height: 100%;
   background: #fcfafd;
   border-right: 1px solid var(--border-color);
   padding: 10px 10px;
-  overflow-y: auto;
   box-sizing: border-box;
+  overflow-y: auto;
 }
 .sidebar-section {
   margin-bottom: 16px;

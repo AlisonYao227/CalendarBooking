@@ -1251,7 +1251,7 @@ function renderMonthView() {
             const style = getRoomStyle(ev.room);
             const dispRoom = getRoomDisplayText(ev.room);
             const prefix = isOnEndDate ? '[跨日] ' : '';
-            html += `<div class="event-label" data-idx="${index}" style="background-color:${style.label};color:#fff;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%;box-sizing:border-box;cursor:pointer;"><strong>${ev.startTime}-${ev.endTime}</strong> ${prefix}${ev.name}｜${dispRoom}</div>`;
+            html += `<div class="event-label" data-idx="${index}" style="background-color:${style.label};color:#fff;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;width:100%;box-sizing:border-box;cursor:pointer;"><strong>${ev.startTime}-${ev.endTime}</strong> ${prefix}${ev.name}</div>`;
         });
 
         // todos

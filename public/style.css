@@ -527,7 +527,7 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   .day { overflow: hidden; min-height: 80px; }
   .day-inner { min-height: 80px; }
   .day-events { min-height: 40px; }
-  .event-label { font-size: 8px !important; }
+  .event-label { font-size: 7px !important; width: 100% !important; }
 }
 
 /* Loading spinner */

@@ -560,11 +560,9 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   max-width: 1370px;
   margin: 0 auto;
   display: flow-root;
-  min-height: 800px;
 }
 #mainViewContainer {
-  margin-left: 170px;
-  width: 1200px;
+  width: calc(100% - 170px);
 }
 #leftSidebar {
   float: left;
@@ -662,9 +660,3 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 .mini-cal-day.selected { background: var(--primary-color); color: #fff; font-weight: 600; }
 .mini-cal-day.other-month { color: #ccc; }
 .mini-cal-day.empty { cursor: default; }
-
-/* DEBUG: 2026-02-28 高亮 */
-.day[data-date="2026-02-28"] {
-  outline: 4px solid red !important;
-  background: #fffbe6 !important;
-}

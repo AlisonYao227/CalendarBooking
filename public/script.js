@@ -239,7 +239,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
             currentDate = new Date(today.getFullYear(), today.getMonth(), 1);
             selectedCalendarDate = new Date(today);
-            updateView();
+            viewSelect.value = 'month';
+            viewSelect.dispatchEvent(new Event('change'));
         };
     }
     
@@ -1533,6 +1534,32 @@ function renderEventsIntoColumn(columnElement, dateStr) {
             }
         }
     });
+
+    // 在時間格下方顯示待辦事項和假期（簡潔文字列表）
+    const extrasContainer = document.createElement('div');
+    extrasContainer.style.cssText = 'padding: 4px 6px; font-size: 10px; line-height: 1.5; border-top: 1px solid #eee; margin-top: 4px;';
+    const dayTodos = (todosData || []).filter(todo => {
+        if (filterEmployee && todo.employee !== filterEmployee) return false;
+        if (filterRoom && todo.room !== filterRoom) return false;
+        return todo.startDate <= dateStr && todo.endDate >= dateStr;
+    });
+    const dayLeaves = getLeavesForDate ? getLeavesForDate(dateStr).filter(l => {
+        if (filterEmployee && l.employee !== filterEmployee) return false;
+        return true;
+    }) : [];
+    if (dayTodos.length > 0 || dayLeaves.length > 0) {
+        let extrasHtml = '';
+        dayTodos.forEach(todo => {
+            const timeStr = todo.isAllDay ? '全天' : (todo.startTime || '');
+            extrasHtml += `<div style="color:#5d4037;padding:1px 0;"><span style="color:#f9a825;font-weight:bold;">&#9744;</span> ${timeStr} ${todo.title}${todo.employee ? ' ('+todo.employee+')' : ''}</div>`;
+        });
+        dayLeaves.forEach(leave => {
+            const prefix = leave.leaveDate === dateStr ? '' : '[跨日] ';
+            extrasHtml += `<div style="color:#2e7d32;padding:1px 0;"><span style="color:#4caf50;font-weight:bold;">&#9632;</span> ${prefix}${leave.employee}${leave.leaveType ? ' ('+leave.leaveType+')' : ''}</div>`;
+        });
+        extrasContainer.innerHTML = extrasHtml;
+        columnElement.appendChild(extrasContainer);
+    }
 }
 
 // --- 3. 彈窗詳情邏輯
@@ -1677,10 +1704,19 @@ function openBookingForm(dateStr, index = -1) {
 }
 
 //確認預約按鈕
+let isSubmitting = false;
+const recentSubmissions = new Map();
+function isDuplicateSubmission(key) {
+    const now = Date.now();
+    if (recentSubmissions.has(key) && now - recentSubmissions.get(key) < 5000) return true;
+    recentSubmissions.set(key, now);
+    return false;
+}
 if(bookBtn){
 bookBtn.onclick = async (e) => {
     if(e) e.preventDefault();
     if(e) e.stopPropagation();
+    if (isSubmitting) return;
     console.log("[BOOK] clicked, selectedDateStr=", selectedDateStr, "currentViewIndex=", currentViewIndex);
     // 1. 全部取值並強制清除首尾空白
     const rawName = document.getElementById("eventTitle").value;
@@ -1767,7 +1803,13 @@ bookBtn.onclick = async (e) => {
     });
     if (isConflict) { console.log("[BOOK] BLOCKED: conflict"); return alert("該時段房間已有預約"); }
 
+    // 前端去重：5秒內相同日期+房間+時間的預約擋下
+    const dedupKey = `${date}|${room}|${startTime}|${endTime}`;
+    if (isDuplicateSubmission(dedupKey)) { console.log("[BOOK] BLOCKED: duplicate"); return alert("請勿重複提交"); }
+
     console.log("[BOOK] calling API...");
+    isSubmitting = true;
+    bookBtn.disabled = true;
     try{
         let saved;
         if (currentViewIndex >= 0 && eventsData[currentViewIndex] && eventsData[currentViewIndex].id) {
@@ -1786,6 +1828,9 @@ bookBtn.onclick = async (e) => {
     }catch(err){
         console.error("[BOOK] API error:", err);
         alert("儲存失敗：" + err.message);
+    }finally{
+        isSubmitting = false;
+        bookBtn.disabled = false;
     }
 };
 }
@@ -1814,29 +1859,30 @@ function getCurrentViewYM(){
 function getFilterEvents(range){
     const {year,month} = getCurrentViewYM();
     let list = [];
-    if(range === "currentMonth"){
-        eventsData.forEach(ev=>{
-            const y = parseInt(ev.date.split("-")[0]);
-            const m = parseInt(ev.date.split("-")[1]) - 1;
-            if(y === year && m === month) list.push(ev);
-        })
-    }else if(range === "currentDay"){
-        const targetDay = getFormattedDate(selectedCalendarDate);
-        eventsData.forEach(ev=>{
-            if(ev.date === targetDay) list.push(ev);
-        })
-    }else if(range === "currentWeek"){
-        const startOfWeek = new Date(currentDate);
-        startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
-        eventsData.forEach(ev=>{
-            const evDate = new Date(ev.date);
-            if(evDate >= startOfWeek && evDate <= endOfWeek) list.push(ev);
-        })
-    }else{
-        list = [...eventsData];
-    }
+    const inRange = (dateStr) => {
+        if (range === "currentMonth") {
+            const y = parseInt(dateStr.split("-")[0]);
+            const m = parseInt(dateStr.split("-")[1]) - 1;
+            return y === year && m === month;
+        } else if (range === "currentDay") {
+            return dateStr === getFormattedDate(selectedCalendarDate);
+        } else if (range === "currentWeek") {
+            const startOfWeek = new Date(currentDate);
+            startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+            const d = new Date(dateStr);
+            return d >= startOfWeek && d <= endOfWeek;
+        }
+        return true; // allYear
+    };
+    eventsData.forEach(ev => { if (inRange(ev.date)) list.push(ev); });
+    if (todosData) todosData.forEach(todo => {
+        if (inRange(todo.startDate)) list.push({ ...todo, _type: 'todo', name: todo.title, date: todo.startDate, startTime: todo.startTime || '', endTime: todo.endTime || '' });
+    });
+    if (typeof leavesData !== 'undefined') leavesData.forEach(leave => {
+        if (inRange(leave.leaveDate)) list.push({ ...leave, _type: 'leave', name: leave.employee + ' 休假' + (leave.leaveType ? '(' + leave.leaveType + ')' : ''), employee: leave.employee, date: leave.leaveDate, startTime: '', endTime: '' });
+    });
     // 套用員工/房間篩選
     if (filterEmployee) list = list.filter(ev => ev.employee === filterEmployee);
     if (filterRoom) list = list.filter(ev => ev.room === filterRoom);
@@ -1988,7 +2034,7 @@ function getFilteredLeaves(range){
 // 匯出 PDF
 function exportPdf(range){
     const data = getFilterEvents(range);
-    if(data.length === 0) return alert("該範圍無任何預約記錄");
+    if(data.length === 0) return alert("該範圍無任何記錄");
     const {year,month} = getCurrentViewYM();
     const monthStr = String(month + 1).padStart(2,"0");
     let fileName;
@@ -2074,23 +2120,66 @@ function exportPdf(range){
                     doc.text(String(dayNum), x + 2, y + 3.5);
 
                     const dayEvents = data.filter(ev => ev.date === dateStr);
+                    const holiday = isHoliday(dateStr);
+                    const cellWAvailable = colW - 2;
+                    let maxLines = Math.max(1, Math.floor((cellH - 10) / 3.5));
+                    let fontSize = 7;
+                    let lineH = 4;
+                    if (maxLines < 2) { fontSize = 5; lineH = 2.8; maxLines = Math.max(1, Math.floor((cellH - 10) / 2.4)); }
+                    else if (maxLines < 3) { fontSize = 6; lineH = 3.2; }
                     doc.setFont(undefined, 'normal');
-                    doc.setFontSize(6);
+                    doc.setFontSize(fontSize);
                     let ey = y + 7;
+                    if (holiday) {
+                        doc.setTextColor(211, 47, 47);
+                        doc.setFont(undefined, 'bold');
+                        doc.setFontSize(Math.min(fontSize, 6));
+                        let holidayText = holiday.name;
+                        if (doc.getTextWidth(holidayText) > cellWAvailable) {
+                            while (doc.getTextWidth(holidayText + '…') > cellWAvailable && holidayText.length > 1) holidayText = holidayText.slice(0, -1);
+                            holidayText += '…';
+                        }
+                        doc.text(holidayText, x + 1, ey);
+                        ey += lineH - 1;
+                        maxLines--;
+                        doc.setTextColor(51);
+                        doc.setFont(undefined, 'normal');
+                        doc.setFontSize(fontSize);
+                    }
                     dayEvents.forEach(ev => {
-                        if(ey + 3 > y + cellH) return;
-                        const roomStyle = getRoomStyle(ev.room);
-                        const hex = roomStyle.label || '#7c5cbf';
-                        const r = parseInt(hex.slice(1,3),16);
-                        const g = parseInt(hex.slice(3,5),16);
-                        const b = parseInt(hex.slice(5,7),16);
-                        doc.setFillColor(r, g, b);
-                        doc.rect(x + 0.5, ey - 2.5, colW - 1, 3.8, 'F');
-                        doc.setTextColor(255, 255, 255);
-                        doc.setFontSize(7);
-                        const txt = `${ev.startTime} ${ev.name} - ${ev.room}`;
-                        doc.text(txt, x + 1, ey);
-                        ey += 4;
+                        if (maxLines <= 0) return;
+                        if (ev._type === 'leave') {
+                            doc.setFillColor(76, 175, 80);
+                            doc.rect(x + 0.5, ey - 2, cellWAvailable, 3, 'F');
+                            doc.setTextColor(255, 255, 255);
+                            const txt = ev.name;
+                            doc.text(txt, x + 1, ey);
+                            ey += lineH;
+                            maxLines--;
+                        } else if (ev._type === 'todo') {
+                            doc.setFillColor(249, 168, 37);
+                            doc.rect(x + 0.5, ey - 2, cellWAvailable, 3, 'F');
+                            doc.setTextColor(93, 64, 55);
+                            const txt = (ev.startTime || '') + ' ' + ev.name;
+                            doc.text(txt, x + 1, ey);
+                            ey += lineH;
+                            maxLines--;
+                        } else {
+                            if (ey + lineH > y + cellH) return;
+                            const roomStyle = getRoomStyle(ev.room);
+                            const hex = roomStyle.label || '#7c5cbf';
+                            const r = parseInt(hex.slice(1,3),16);
+                            const g = parseInt(hex.slice(3,5),16);
+                            const b = parseInt(hex.slice(5,7),16);
+                            doc.setFillColor(r, g, b);
+                            doc.rect(x + 0.5, ey - 2.5, cellWAvailable, 3.8, 'F');
+                            doc.setTextColor(255, 255, 255);
+                            doc.setFontSize(fontSize);
+                            const txt = `${ev.startTime} ${ev.name} - ${ev.room}`;
+                            doc.text(txt, x + 1, ey);
+                            ey += lineH;
+                            maxLines--;
+                        }
                     });
                     doc.setTextColor(51);
                 }

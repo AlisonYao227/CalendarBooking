@@ -509,9 +509,6 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   font-size: 9px;
   color: #d32f2f;
   line-height: 1.1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   max-width: 100%;
 }
 
@@ -523,4 +520,12 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   border-radius: 2px;
   margin-right: 3px;
   vertical-align: middle;
+}
+
+@media print {
+  .holiday-tag { white-space: normal; overflow: visible; text-overflow: clip; font-size: 7px; }
+  .day-inner { min-height: 80px; }
+  .day { min-height: 80px; }
+  .day-events { min-height: 40px; }
+  .event-label { font-size: 8px !important; }
 }

@@ -6,7 +6,7 @@
   --day-today-bg: #dceeff;
 }
 
-body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding: 10px 10px; overflow-x: hidden; }
+body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding: 10px 10px; overflow-x: hidden; scrollbar-gutter: stable; }
 
 .main-container { max-width: 1200px; margin: 0 auto; background: #fff; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); overflow: hidden; }
 

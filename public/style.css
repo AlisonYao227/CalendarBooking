@@ -562,6 +562,7 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   max-width: 1570px;
   width: 100%;
   margin: 0 auto;
+  position: relative;
 }
 #mainViewContainer {
   flex: 1 1 1400px;
@@ -591,15 +592,16 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 }
 .sidebar-toggle {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 22px;
-  height: 22px;
+  top: 0;
+  left: 170px;
+  width: 20px;
+  height: 26px;
   border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: #fff;
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+  background: #fcfafd;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -607,9 +609,14 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   padding: 0;
   line-height: 1;
   z-index: 10;
-  transition: background 0.15s;
+  transition: left 0.2s, background 0.15s;
 }
 .sidebar-toggle:hover { background: #f0ecf8; color: var(--primary-color); }
+.main-layout.collapsed .sidebar-toggle {
+  left: 0;
+  border-left: 1px solid var(--border-color);
+  border-radius: 0 4px 4px 0;
+}
 .sidebar-section {
   margin-bottom: 16px;
 }

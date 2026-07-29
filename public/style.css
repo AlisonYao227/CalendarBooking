@@ -524,8 +524,8 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 
 @media print {
   .holiday-tag { white-space: normal; overflow: visible; text-overflow: clip; font-size: 7px; }
+  .day { overflow: hidden; min-height: 80px; }
   .day-inner { min-height: 80px; }
-  .day { min-height: 80px; }
   .day-events { min-height: 40px; }
   .event-label { font-size: 8px !important; }
 }

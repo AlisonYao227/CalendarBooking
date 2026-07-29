@@ -169,7 +169,33 @@
   </div>
 </div>
 
-<div id="mainViewContainer">
+<!-- 左側邊欄 + 主視圖 -->
+<div class="main-layout">
+  <aside id="leftSidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">房間</div>
+      <div id="roomChips"></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="mini-cal-header">
+        <button class="mini-cal-nav" id="miniCalPrev">‹</button>
+        <span id="miniCalTitle"></span>
+        <button class="mini-cal-nav" id="miniCalNext">›</button>
+      </div>
+      <div class="mini-cal-grid">
+        <div class="mini-cal-weekday">日</div>
+        <div class="mini-cal-weekday">一</div>
+        <div class="mini-cal-weekday">二</div>
+        <div class="mini-cal-weekday">三</div>
+        <div class="mini-cal-weekday">四</div>
+        <div class="mini-cal-weekday">五</div>
+        <div class="mini-cal-weekday">六</div>
+        <div id="miniCalDays"></div>
+      </div>
+    </div>
+  </aside>
+
+  <div id="mainViewContainer">
     <div id="monthView" class="calendar-grid">
       <div class="weekdays">
         <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
@@ -194,6 +220,7 @@
         <div class="event-grid" id="eventGrid">
             </div>
     </div>
+</div>
 </div>
 </div>
 

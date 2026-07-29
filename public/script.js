@@ -332,6 +332,8 @@ async function loadAllData() {
 
         updateView();
         initFilterDropdowns();
+        renderRoomChips();
+        renderMiniCalendar();
     } catch (err) {
         console.error("載入後端數據失敗：", err);
     } finally {
@@ -1155,6 +1157,8 @@ function updateView() {
 
     //切換視圖自動同步匯出下拉灰化
     syncExportRangeOptionState();
+    syncMiniCalendar();
+    renderRoomChips();
 }
 
 /**
@@ -2434,6 +2438,80 @@ function getCompactRoomText(roomName){
     if (words.length === 1 && words[0].length <= 5) return words[0];
     return words.map(w => /^[A-Z]+$/.test(w) ? w : w.charAt(0).toUpperCase()).join('');
 }
+
+// ====== 左側邊欄：房間色塊 ======
+function renderRoomChips() {
+    const wrap = document.getElementById('roomChips');
+    if (!wrap) return;
+    const allRooms = [...roomList];
+    let html = `<button class="room-chip${!filterRoom ? ' active' : ''}" data-room="" style="border-left:3px solid #ccc;"><span class="chip-dot" style="background:#ccc;"></span>全部</button>`;
+    allRooms.forEach(r => {
+        const style = roomColorMap[r.name] || { bg: '#eee', border: '#999', label: '#999' };
+        html += `<button class="room-chip${filterRoom === r.name ? ' active' : ''}" data-room="${r.name.replace(/"/g, '&quot;')}" style="border-left:3px solid ${style.border};background:${style.bg}20;">
+            <span class="chip-dot" style="background:${style.border};"></span>${r.name}</button>`;
+    });
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('.room-chip').forEach(el => {
+        el.onclick = () => {
+            const room = el.dataset.room || '';
+            filterRoom = room;
+            renderRoomChips();
+            updateView();
+        };
+    });
+}
+
+// ====== 左側邊欄：迷你月曆 ======
+let _miniCalDate = new Date();
+function renderMiniCalendar() {
+    const titleEl = document.getElementById('miniCalTitle');
+    const daysEl = document.getElementById('miniCalDays');
+    if (!titleEl || !daysEl) return;
+    const year = _miniCalDate.getFullYear();
+    const month = _miniCalDate.getMonth();
+    titleEl.textContent = `${months[month]} ${year}`;
+    const firstDay = new Date(year, month, 1).getDay();
+    const lastDate = new Date(year, month + 1, 0).getDate();
+    const todayStr = getTodayStr();
+    const curMonthStr = `${year}-${String(month+1).padStart(2,'0')}`;
+    let html = '';
+    for (let i = 0; i < firstDay; i++) html += '<div class="mini-cal-day empty"></div>';
+    for (let i = 1; i <= lastDate; i++) {
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+        const isToday = dateStr === todayStr;
+        const isSelected = dateStr === getFormattedDate(selectedCalendarDate);
+        html += `<div class="mini-cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}" data-date="${dateStr}">${i}</div>`;
+    }
+    daysEl.innerHTML = html;
+    daysEl.querySelectorAll('.mini-cal-day[data-date]').forEach(el => {
+        el.onclick = () => {
+            const d = new Date(el.dataset.date + 'T00:00:00');
+            currentDate = new Date(d.getFullYear(), d.getMonth(), 1);
+            selectedCalendarDate = new Date(d);
+            _miniCalDate = new Date(d.getFullYear(), d.getMonth(), 1);
+            if (viewSelect.value !== 'month') {
+                viewSelect.value = 'month';
+                viewSelect.dispatchEvent(new Event('change'));
+            } else {
+                updateView();
+            }
+        };
+    });
+}
+
+// 同步迷你月曆與主視圖當前月份
+function syncMiniCalendar() {
+    _miniCalDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    renderMiniCalendar();
+}
+
+// 初始化邊欄事件
+(function initSidebar() {
+    const prevBtn = document.getElementById('miniCalPrev');
+    const nextBtn = document.getElementById('miniCalNext');
+    if (prevBtn) prevBtn.onclick = () => { _miniCalDate.setMonth(_miniCalDate.getMonth() - 1); renderMiniCalendar(); };
+    if (nextBtn) nextBtn.onclick = () => { _miniCalDate.setMonth(_miniCalDate.getMonth() + 1); renderMiniCalendar(); };
+})();
     
 function exportPublicCalendarJson(){
   const publicData = {

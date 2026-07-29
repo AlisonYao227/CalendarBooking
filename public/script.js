@@ -278,6 +278,7 @@ if(btnEditDetail){
     const btnDeleteDetail = document.getElementById('btnDeleteDetail');
 if(btnDeleteDetail){
     btnDeleteDetail.onclick = async () => {
+        if (!clickGuard(btnDeleteDetail)) return;
         const ev = eventsData[currentViewIndex];
         if (confirm(`確定要刪除「${ev.name}」的預約嗎？`)) {
             try {
@@ -293,6 +294,7 @@ if(btnDeleteDetail){
 }
 // 一次性載入預約、房間、員工全域數據
 async function loadAllData() {
+    showLoading();
     try {
         // 載入預約
         const evRes = await fetch(`${API_BASE}/reservations`);
@@ -332,6 +334,8 @@ async function loadAllData() {
         initFilterDropdowns();
     } catch (err) {
         console.error("載入後端數據失敗：", err);
+    } finally {
+        hideLoading();
     }
 }
 
@@ -658,6 +662,7 @@ startExportBtn.onclick = () => {
     const batchDeleteBtn = document.getElementById('batchDeleteBtn');
     if(batchDeleteBtn){
     batchDeleteBtn.onclick = async function(){
+        if (!clickGuard(batchDeleteBtn)) return;
         const inputBinPwd = await showPasswordPrompt("請輸入管理密碼，進入批量刪除功能：");
         if(inputBinPwd === null) return;
         try {
@@ -718,6 +723,7 @@ startExportBtn.onclick = () => {
 
         // 清除本月
         delMonthBtn.onclick = async function(){
+            if (!clickGuard(delMonthBtn)) return;
             const ymInfo = getCurrentViewYM();
             const targetYear = ymInfo.year;
             const targetMonth = ymInfo.month;
@@ -740,6 +746,7 @@ startExportBtn.onclick = () => {
 
         // 清除當日
         delDayBtn.onclick = async function(){
+            if (!clickGuard(delDayBtn)) return;
             const targetDateStr = getFormattedDate(selectedCalendarDate);
             const ok = confirm(`⚠️ 永久刪除【${targetDateStr}】所有預約？\n此操作無法復原！`);
             if(!ok) return;
@@ -758,6 +765,7 @@ startExportBtn.onclick = () => {
     // 打開設定視窗
     if(settingBtn){
     settingBtn.onclick = async () => {
+    if (!clickGuard(settingBtn)) return;
     const inputPwd = await showPasswordPrompt("請輸入管理密碼進入系統設定：");
     if(inputPwd === null) return;
     try {
@@ -827,6 +835,7 @@ document.querySelectorAll('.short-input').forEach(input=>{
     // --- 綁定刪除按鈕 ---
     document.querySelectorAll('.list-item button').forEach(btn => {
         btn.onclick = async () => {
+            if (!clickGuard(btn)) return;
             const type = btn.dataset.type;
             const i = Number(btn.dataset.idx);
             if(type === 'room'){
@@ -876,6 +885,7 @@ document.querySelectorAll('.short-input').forEach(input=>{
         })
 
         document.getElementById('clearAllTrashBtn').onclick = async function(){
+            if (!clickGuard(this)) return;
             if(!confirm("確認永久清空回收站所有房間？此操作無法復原！")) return;
             try {
                 await fetch(`${API_BASE}/rooms/trash/empty`, { method: "DELETE" });
@@ -888,6 +898,7 @@ document.querySelectorAll('.short-input').forEach(input=>{
     // 回收站按鈕綁定
     document.querySelectorAll('#trashRoomWrap .list-item button').forEach(btn => {
         btn.onclick = async () => {
+            if (!clickGuard(btn)) return;
             const t = btn.dataset.type;
             const i = Number(btn.dataset.idx);
             const trashItem = trashRoomList[i];
@@ -918,9 +929,10 @@ document.querySelectorAll('.short-input').forEach(input=>{
     announcementInput.value = annText;
 
     //公告欄儲存按鈕
-    saveAnnouncementBtn.onclick = () => {
+    saveAnnouncementBtn.onclick = async () => {
+        if (!clickGuard(saveAnnouncementBtn)) return;
         const txt = announcementInput.value;
-        saveAnnouncement(txt);
+        await saveAnnouncement(txt);
         alert("公告設定已儲存");
     };
 
@@ -953,6 +965,7 @@ document.querySelectorAll('.short-input').forEach(input=>{
     // --- 新增房間 ---
     if(addRoomBtn){
     addRoomBtn.onclick = async () => {
+    if (!clickGuard(addRoomBtn)) return;
     const val = newRoomInput.value.trim();
     if(!val) return alert("請輸入房間名稱");
     try {
@@ -975,6 +988,7 @@ document.querySelectorAll('.short-input').forEach(input=>{
     // --- 新增員工 ---
     if(addEmpBtn){
     addEmpBtn.onclick = async () => {
+        if (!clickGuard(addEmpBtn)) return;
         const val = newEmpInput.value.trim();
         if(!val) return alert("請輸入員工姓名");
         try {
@@ -999,6 +1013,7 @@ document.querySelectorAll('.short-input').forEach(input=>{
 
     if (todosBtn) {
         todosBtn.onclick = async () => {
+            if (!clickGuard(todosBtn)) return;
             populateTodoDropdowns();
             document.getElementById('todoStartDate').value = getTodayStr();
             document.getElementById('todoEndDate').value = getTodayStr();
@@ -1701,6 +1716,35 @@ function openBookingForm(dateStr, index = -1) {
         }
     }
     modalForm.classList.add("active");
+}
+
+// 通用雙擊防護：以元素為 key，1.5 秒內不重複觸發
+const _clickGuardSet = new WeakSet();
+function clickGuard(el) {
+    if (_clickGuardSet.has(el)) return false;
+    _clickGuardSet.add(el);
+    setTimeout(() => _clickGuardSet.delete(el), 1500);
+    return true;
+}
+const _clickGuardMap = new Map();
+function clickGuardKey(key) {
+    const now = Date.now();
+    if (_clickGuardMap.has(key) && now - _clickGuardMap.get(key) < 1500) return false;
+    _clickGuardMap.set(key, now);
+    return true;
+}
+
+// 載入中轉圈
+let _loadingTimer = 0;
+function showLoading() {
+    clearTimeout(_loadingTimer);
+    const el = document.getElementById('loadingSpinner');
+    if (el) el.style.display = 'flex';
+}
+function hideLoading() {
+    clearTimeout(_loadingTimer);
+    const el = document.getElementById('loadingSpinner');
+    if (el) el.style.display = 'none';
 }
 
 //確認預約按鈕
@@ -2528,6 +2572,7 @@ async function deleteTodoGroupByKey(idx) {
     const key = window._todoGroupKeys[idx];
     const todos = window._todoGroups[key];
     if (!todos || !todos.length) return;
+    if (!clickGuardKey('delTodo_' + key)) return;
     const todo = todos[0];
     if (!confirm(`確定刪除此批「${todo.title}」所有 ${todos.length} 條代辦事項？`)) return;
     try {
@@ -2555,7 +2600,9 @@ function showTodoDetail(todo) {
     document.getElementById('todoDetailRoom').textContent = todo.room || '';
     document.getElementById('todoDetailEmployee').innerHTML = '負責人：<span>' + (todo.employee || '') + '</span>';
 
-    document.getElementById('btnDeleteTodoDetail').onclick = async () => {
+    const delBtn = document.getElementById('btnDeleteTodoDetail');
+    delBtn.onclick = async () => {
+        if (!clickGuard(delBtn)) return;
         if (!confirm('確定刪除此代辦事項？')) return;
         await fetch(`${API_BASE}/todos/${todo.id}`, { method: 'DELETE' });
         modal.classList.remove("active");
@@ -2645,6 +2692,7 @@ function editTodoItem(todo) {
     const addLeaveBtn = document.getElementById('addLeaveBtn');
     if (addLeaveBtn) {
         addLeaveBtn.onclick = async () => {
+            if (!clickGuard(addLeaveBtn)) return;
             const employee = document.getElementById('leaveEmployee').value;
             const leaveDate = document.getElementById('leaveStartDate').value;
             const endDate = document.getElementById('leaveEndDate').value;
@@ -2688,6 +2736,7 @@ function editTodoItem(todo) {
             btn.title = '刪除';
             btn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
             btn.onclick = async () => {
+                if (!clickGuard(btn)) return;
                 const dateDisplay = (leave.endDate && leave.endDate !== leave.leaveDate) ? `${leave.leaveDate} ~ ${leave.endDate}` : leave.leaveDate;
                 if (!confirm(`確定刪除 ${leave.employee} ${dateDisplay} 的假期記錄？`)) return;
                 await fetch(`${API_BASE}/employee-leaves/${leave.id}`, { method: 'DELETE' });
@@ -2711,7 +2760,9 @@ function showLeaveDetail(leave) {
     document.getElementById('todoDetailRoom').textContent = '';
     document.getElementById('todoDetailEmployee').textContent = '';
 
-    document.getElementById('btnDeleteTodoDetail').onclick = async () => {
+    const delLeaveBtn = document.getElementById('btnDeleteTodoDetail');
+    delLeaveBtn.onclick = async () => {
+        if (!clickGuard(delLeaveBtn)) return;
         if (!confirm('確定刪除此假期記錄？')) return;
         await fetch(`${API_BASE}/employee-leaves/${leave.id}`, { method: 'DELETE' });
         modal.classList.remove("active");

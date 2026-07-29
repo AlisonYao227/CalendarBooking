@@ -1405,11 +1405,12 @@ function getDayExtrasHtml(dateStr) {
     let html = '';
     dayTodos.forEach(todo => {
         const timeStr = todo.isAllDay ? '全天' : (todo.startTime || '');
-        html += '<div style="color:#5d4037;padding:2px 0;"><span style="color:#f9a825;font-weight:bold;">&#9744;</span> ' + timeStr + ' ' + todo.title + (todo.employee ? ' (' + todo.employee + ')' : '') + '</div>';
+        html += '<div class="event-label todo-label" style="background-color:#fff8e1;color:#5d4037;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;width:100%;box-sizing:border-box;cursor:pointer;border-left:3px solid #f9a825;"><span class="todo-marker"></span> ' + timeStr + ' ' + todo.title + (todo.employee ? ' (' + todo.employee + ')' : '') + '</div>';
     });
     dayLeaves.forEach(leave => {
         const prefix = leave.leaveDate === dateStr ? '' : '[跨日] ';
-        html += '<div style="color:#2e7d32;padding:2px 0;"><span style="color:#4caf50;font-weight:bold;">&#9632;</span> ' + prefix + leave.employee + (leave.leaveType ? ' (' + leave.leaveType + ')' : '') + '</div>';
+        const leaveTypeStr = leave.leaveType ? ' (' + leave.leaveType + ')' : '';
+        html += '<div class="event-label leave-label" style="background-color:#e8f5e9;color:#2e7d32;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;width:100%;box-sizing:border-box;cursor:pointer;border-left:3px solid #4caf50;"><span class="leave-square"></span> ' + prefix + leave.employee + leaveTypeStr + '</div>';
     });
     return html;
 }

@@ -436,6 +436,9 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   align-items: center;
   justify-content: center;
   padding: 0;
+  width: auto;
+  height: auto;
+  white-space: nowrap;
 }
 .info-btn:hover {
   background: #eee;
@@ -633,6 +636,18 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 }
 .sidebar-section {
   margin-bottom: 16px;
+}
+#roomChips {
+  max-height: calc(100vh - 280px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+#roomChips::-webkit-scrollbar {
+  width: 4px;
+}
+#roomChips::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
 }
 .sidebar-title {
   font-size: 11px;

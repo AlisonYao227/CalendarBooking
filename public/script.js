@@ -497,11 +497,11 @@ function getFilteredData() {
                                 return ev.room === roomName && (dateStr+'T'+sTime) < (evEnd+'T'+ev.endTime) && (importEndDate+'T'+eTime) > (ev.date+'T'+ev.startTime);
                             });
                             if (isConflict) { totalSkip++; allSkipList.push(`[預約]第${excelRow}行「${name}」：${dateStr} ${roomName} 時段衝突`); return; }
-                            importList.push({ date: dateStr, endDate: importEndDate, name: String(name).trim(), employee: empName, room: roomName, startTime: sTime, endTime: eTime });
+                            importList.push({ date: dateStr, endDate: importEndDate, name: String(name).trim(), employee: empName, room: roomName, startTime: sTime, endTime: eTime, row: excelRow });
                             totalSuccess++;
                         });
                         if (importList.length > 0) {
-                            try { const res = await fetch(`${API_BASE}/reservations/batch`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({list:importList}) }); const result = await res.json(); if (!result.ok) { totalSkip += importList.length; allSkipList.push("[預約]批量匯入失敗："+result.msg); } } catch(err) { totalSkip += importList.length; allSkipList.push("[預約]批量匯入失敗："+err.message); }
+                            try { const res = await fetch(`${API_BASE}/reservations/batch`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({list:importList}) }); const result = await res.json(); if (!result.ok) { totalSkip += importList.length; allSkipList.push("[預約]批量匯入失敗："+result.msg); } else if (result.fail > 0) { totalSuccess -= result.fail; totalSkip += result.fail; if (result.failDetails) result.failDetails.forEach(d => allSkipList.push("[預約]"+d)); } } catch(err) { totalSkip += importList.length; allSkipList.push("[預約]批量匯入失敗："+err.message); }
                         }
 
                     } else if (headers.includes('標題') || headers.includes('開始日期')) {
@@ -572,7 +572,7 @@ function getFilteredData() {
                             totalSuccess++;
                         }
                         if (leaveList.length > 0) {
-                            try { const res = await fetch(`${API_BASE}/employee-leaves/batch`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({list:leaveList}) }); const result = await res.json(); if (!result.ok) { totalSkip += leaveList.length; allSkipList.push("[員工假期]批量匯入失敗："+result.msg); } } catch(err) { totalSkip += leaveList.length; allSkipList.push("[員工假期]批量匯入失敗："+err.message); }
+                            try { const res = await fetch(`${API_BASE}/employee-leaves/batch`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({list:leaveList}) }); const result = await res.json(); if (!result.ok) { totalSkip += leaveList.length; allSkipList.push("[員工假期]批量匯入失敗："+result.msg); } else if (result.fail > 0) { totalSuccess -= result.fail; totalSkip += result.fail; } } catch(err) { totalSkip += leaveList.length; allSkipList.push("[員工假期]批量匯入失敗："+err.message); }
                         }
                     }
                 for (const rName of allNewRooms) { try { const color = generateRandomRoomColor(); await fetch(`${API_BASE}/rooms`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({name:rName,short:'',colorData:JSON.stringify(color)}) }); } catch(e) {} }
@@ -975,6 +975,7 @@ document.querySelectorAll('.short-input').forEach(input=>{
         newRoomInput.value = "";
         await loadAllData();
         renderSettingLists();
+        newRoomInput.focus();
     } catch(e) { alert("新增失敗：" + e.message); }
 }
     }
@@ -996,6 +997,7 @@ document.querySelectorAll('.short-input').forEach(input=>{
             newEmpInput.value = "";
             await loadAllData();
             renderSettingLists();
+            newEmpInput.focus();
         } catch(e) { alert("新增失敗：" + e.message); }
     }
 }
@@ -1043,6 +1045,10 @@ document.querySelectorAll('.short-input').forEach(input=>{
             const isAllDay = document.getElementById('todoAllDay').checked;
             if (!title || !startDate || !endDate) return alert('請填寫標題和日期');
             if (endDate < startDate) return alert('結束日期不能早於開始日期');
+            if (!room || !employee) {
+                const msg = !room && !employee ? '未指定房間及員工' : !room ? '未指定房間' : '未指定員工';
+                if (!confirm(`${msg}，是否繼續？`)) return;
+            }
 
             todoBusy = true;
             addTodoBtn.disabled = true;
@@ -1418,10 +1424,12 @@ function renderEventsIntoColumn(columnElement, dateStr) {
         return true;
     });
     const timeGroup = {};
-    // 按開始時間分組
+    // 按開始時間分組（跨日結束日歸到 00:00 組）
     dayEvents.forEach(ev => {
-        if (!timeGroup[ev.startTime]) timeGroup[ev.startTime] = [];
-        timeGroup[ev.startTime].push(ev);
+        const isOnEnd = ev.endDate && ev.endDate === dateStr && ev.endDate !== ev.date;
+        const groupKey = isOnEnd ? '00:00' : ev.startTime;
+        if (!timeGroup[groupKey]) timeGroup[groupKey] = [];
+        timeGroup[groupKey].push(ev);
     });
 
     Object.values(timeGroup).forEach(group => {
@@ -1446,7 +1454,7 @@ function renderEventsIntoColumn(columnElement, dateStr) {
                     displayStart = '00:00';
                 }
                 if (isOnStart && ev.endDate && ev.endDate !== ev.date) {
-                    displayEnd = '23:30';
+                    displayEnd = '24:00';
                 }
                 const [sH, sM] = displayStart.split(':').map(Number);
                 const top = ((sH - startHour) * 60) + sM;
@@ -1477,7 +1485,7 @@ function renderEventsIntoColumn(columnElement, dateStr) {
                     white-space:nowrap;
                     text-overflow:ellipsis;
                 `;
-                evEl.innerHTML = `<strong>${ev.startTime}</strong> ${ev.name}｜${dispRoom}`;
+                evEl.innerHTML = `<strong>${displayStart}</strong> ${ev.name}｜${dispRoom}`;
                 evEl.onclick = (e) => {
                     e.stopPropagation();
                     const targetIndex = eventsData.findIndex(item => item === ev);
@@ -1528,7 +1536,9 @@ function renderEventsIntoColumn(columnElement, dateStr) {
             const hiddenCount = total - MAX_VERTICAL_SHOW;
 
             visibleList.forEach((ev, idx) => {
-                const [sH, sM] = ev.startTime.split(':').map(Number);
+                const isOnEnd = ev.endDate && ev.endDate === dateStr && ev.endDate !== ev.date;
+                const displayStart = isOnEnd ? '00:00' : ev.startTime;
+                const [sH, sM] = displayStart.split(':').map(Number);
                 const baseTop = ((sH - startHour) * 60) + sM;
                 const blockTop = baseTop + idx * itemHeight;
 
@@ -1555,7 +1565,7 @@ function renderEventsIntoColumn(columnElement, dateStr) {
                     white-space: nowrap;
                     text-overflow: ellipsis;
                 `;
-                evEl.innerHTML = `<strong>${ev.startTime}</strong> ${ev.name}｜${dispRoom}`;
+                evEl.innerHTML = `<strong>${displayStart}</strong> ${ev.name}｜${dispRoom}`;
                 evEl.onclick = (e) => {
                     e.stopPropagation();
                     const targetIndex = eventsData.findIndex(item => item === ev);
@@ -1567,7 +1577,9 @@ function renderEventsIntoColumn(columnElement, dateStr) {
             // 垂直模式聚合 +N 按鈕
             if (hiddenCount > 0) {
                 const baseEv = group[0];
-                const [sH, sM] = baseEv.startTime.split(':').map(Number);
+                const isEnd = baseEv.endDate && baseEv.endDate === dateStr && baseEv.endDate !== baseEv.date;
+                const baseStart = isEnd ? '00:00' : baseEv.startTime;
+                const [sH, sM] = baseStart.split(':').map(Number);
                 const baseTop = ((sH - startHour) * 60) + sM;
                 const moreTop = baseTop + MAX_VERTICAL_SHOW * itemHeight;
 
@@ -2540,9 +2552,8 @@ function renderMiniCalendar() {
     });
 }
 
-// 同步迷你月曆與主視圖當前月份
+// 重新繪製迷你月曆（保持獨立月份，不自動跳回主視圖月份）
 function syncMiniCalendar() {
-    _miniCalDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
     renderMiniCalendar();
 }
 

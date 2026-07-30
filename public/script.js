@@ -421,7 +421,7 @@ function getFilteredData() {
     importTipBtn.onclick = (e) => {
         e.stopPropagation();
         // 固定前置格式說明，每次點擊都顯示
-        let tipText = "【Excel匯入格式規範】\n支援多Sheet匯入，系統會自動偵測每個Sheet的欄位：\n\n📋 Sheet 1「預約」欄位：日期、活動名稱、預約員工、房間、開始時間、結束時間、結束日期(選填)\n📋 Sheet 2「待辦事項」欄位：標題、開始日期、結束日期、開始時間、結束時間、房間、負責人、全日\n📋 Sheet 3「公眾假期」由系統自動抓取，無需匯入\n📋 Sheet 4「員工假期」欄位：員工姓名、開始日期、結束日期(同日=單日)、假期類型(選填)\n\n時間格式：09:00、23:30\n日期格式：2026-01-15\n支援跨日預約（結束時間早於開始時間自動視為隔日結束）\n\n";
+        let tipText = "【Excel匯入格式規範】\n支援多Sheet匯入，系統會自動偵測每個Sheet的欄位：\n\n📋 Sheet 1「預約」欄位：日期、活動名稱、預約員工、房間、開始時間、結束時間（跨日預約結束時間早於開始時間時自動視為隔日結束）\n📋 Sheet 2「待辦事項」欄位：標題、開始日期、結束日期、開始時間、結束時間、房間、負責人、全日\n📋 Sheet 3「公眾假期」由系統自動抓取，無需匯入\n📋 Sheet 4「員工假期」欄位：員工姓名、開始日期、結束日期(同日=單日)、假期類型(選填)\n\n時間格式：09:00、23:30\n日期格式：2026-01-15\n\n";
 
         if(currentImportSkipList.length > 0){
             // 有異常：規範 + 完整錯誤清單
@@ -470,7 +470,6 @@ function getFilteredData() {
                             else if (key === '房間' || key === 'room') headerMap.room = i;
                             else if (key === '開始時間' || key === 'startTime' || key === 'start') headerMap.startTime = i;
                             else if (key === '結束時間' || key === 'endTime' || key === 'end') headerMap.endTime = i;
-                            else if (key === '結束日期' || key === 'endDate') headerMap.endDate = i;
                         });
                         const importList = [];
                         rawData.slice(1).forEach((row, rawIdx) => {
@@ -486,14 +485,7 @@ function getFilteredData() {
                             const sTime = excelTimeToStr(startRaw);
                             const eTime = excelTimeToStr(endRaw);
                             let importEndDate = dateStr;
-                            if (headerMap.endDate !== undefined) {
-                                const rawEndDate = get('endDate');
-                                if (rawEndDate) importEndDate = excelDateToStr(rawEndDate);
-                                else if (sTime >= eTime) {
-                                    const nextDay = new Date(dateStr); nextDay.setDate(nextDay.getDate() + 1);
-                                    importEndDate = getFormattedDate(nextDay);
-                                }
-                            } else if (sTime >= eTime) {
+                            if (sTime >= eTime) {
                                 const nextDay = new Date(dateStr); nextDay.setDate(nextDay.getDate() + 1);
                                 importEndDate = getFormattedDate(nextDay);
                             }
@@ -1997,11 +1989,11 @@ function exportExcel(range){
 
     const book = XLSX.utils.book_new();
 
-    // Sheet 1: 預約（僅預約，不含待辦事項與員工假期）
-    const resData = [["日期","活動名稱","預約員工","房間","開始時間","結束時間","結束日期"]];
+    // Sheet 1: 預約（僅預約，不含待辦事項與員工假期；結束日期由系統依時間自動判斷）
+    const resData = [["日期","活動名稱","預約員工","房間","開始時間","結束時間"]];
     data.forEach(ev=>{
         if (ev._type) return;
-        resData.push([ev.date, ev.name, ev.employee, ev.room, ev.startTime, ev.endTime, ev.endDate || ''])
+        resData.push([ev.date, ev.name, ev.employee, ev.room, ev.startTime, ev.endTime])
     })
     XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(resData), "預約");
 
@@ -2417,8 +2409,9 @@ function exportPdf(range){
 // Excel時間小數轉 HH:MM
 function excelTimeToStr(timeVal) {
     if (typeof timeVal === 'number') {
-        // 0~1 小數 = 一天的比例
-        const totalMin = Math.round(timeVal * 24 * 60);
+        // 只取小數部分（時間），忽略整數部分（日期）
+        const frac = timeVal - Math.floor(timeVal);
+        const totalMin = Math.round(frac * 24 * 60);
         const h = Math.floor(totalMin / 60);
         const m = totalMin % 60;
         return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;

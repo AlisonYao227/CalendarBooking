@@ -57,6 +57,7 @@ async function initDB() {
         create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, update_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
     await query(`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS end_date TEXT;`);
+    await query(`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS note TEXT DEFAULT '';`);
     await query(`CREATE TABLE IF NOT EXISTS employees (
         id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
@@ -143,7 +144,7 @@ app.post('/api/login', async (req, res) => {
 
 // === Reservations ===
 app.post('/api/reservations', async (req, res) => {
-    const { date, name, employee, room, startTime, endTime, endDate } = req.body;
+    const { date, name, employee, room, startTime, endTime, endDate, note } = req.body;
     if (!date || !name || !employee || !room || !startTime || !endTime) return res.json({ ok: false, msg: "所有欄位皆為必填" });
     try {
         const newEnd = endDate || date;
@@ -156,23 +157,23 @@ app.post('/api/reservations', async (req, res) => {
         if (conflict.rows.length > 0) {
             return res.json({ ok: false, msg: `該時段已被 ${conflict.rows[0].employee} 預約` });
         }
-        const r = await query(`INSERT INTO reservations (res_date,title,employee,room_name,start_time,end_time,end_date) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`, [date, name, employee, room, startTime, endTime, endDate || date]);
+        const r = await query(`INSERT INTO reservations (res_date,title,employee,room_name,start_time,end_time,end_date,note) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`, [date, name, employee, room, startTime, endTime, endDate || date, note || '']);
         const id = r.rows[0].id;
-        await logOp('CREATE_RESERVATION', id, `新增: ${date} ${startTime}-${endTime} ${name} [${employee}] ${room}`, req.ip, { date, name, employee, room, startTime, endTime });
+        await logOp('CREATE_RESERVATION', id, `新增: ${date} ${startTime}-${endTime} ${name} [${employee}] ${room}`, req.ip, { date, name, employee, room, startTime, endTime, note });
         res.json({ ok: true, data: { id } });
     } catch (err) { res.json({ ok: false, msg: "儲存失敗：" + err.message }); }
 });
 
 app.get('/api/reservations', async (req, res) => {
     try {
-        const r = await query(`SELECT id, res_date as date, title as name, employee, room_name as room, start_time as "startTime", end_time as "endTime", end_date as "endDate" FROM reservations WHERE is_deleted=0 ORDER BY res_date, start_time`);
+        const r = await query(`SELECT id, res_date as date, title as name, employee, room_name as room, start_time as "startTime", end_time as "endTime", end_date as "endDate", note FROM reservations WHERE is_deleted=0 ORDER BY res_date, start_time`);
         res.json({ ok: true, data: r.rows });
     } catch (err) { res.json({ ok: false, msg: err.message }); }
 });
 
 app.put('/api/reservations/:id', async (req, res) => {
     const id = req.params.id;
-    const { date, name, employee, room, startTime, endTime, endDate } = req.body;
+    const { date, name, employee, room, startTime, endTime, endDate, note } = req.body;
     if (!date || !name || !employee || !room || !startTime || !endTime) return res.json({ ok: false, msg: "所有欄位皆為必填" });
     try {
         const old = await query(`SELECT * FROM reservations WHERE id=$1`, [id]);
@@ -186,10 +187,10 @@ app.put('/api/reservations/:id', async (req, res) => {
         if (conflict.rows.length > 0) {
             return res.json({ ok: false, msg: `該時段已被 ${conflict.rows[0].employee} 預約` });
         }
-        const r = await query(`UPDATE reservations SET res_date=$1,title=$2,employee=$3,room_name=$4,start_time=$5,end_time=$6,end_date=$7,update_at=CURRENT_TIMESTAMP WHERE id=$8 AND is_deleted=0 RETURNING id`, [date, name, employee, room, startTime, endTime, endDate || date, id]);
+        const r = await query(`UPDATE reservations SET res_date=$1,title=$2,employee=$3,room_name=$4,start_time=$5,end_time=$6,end_date=$7,note=$8,update_at=CURRENT_TIMESTAMP WHERE id=$9 AND is_deleted=0 RETURNING id`, [date, name, employee, room, startTime, endTime, endDate || date, note || '', id]);
         if (r.rows.length === 0) return res.json({ ok: false, msg: "找不到該預約" });
         const d = old.rows[0] || {};
-        await logOp('UPDATE_RESERVATION', id, `更新 #${id}`, req.ip, { before: { date: d.res_date, name: d.title, employee: d.employee, room: d.room_name, startTime: d.start_time, endTime: d.end_time }, after: { date, name, employee, room, startTime, endTime } });
+        await logOp('UPDATE_RESERVATION', id, `更新 #${id}`, req.ip, { before: { date: d.res_date, name: d.title, employee: d.employee, room: d.room_name, startTime: d.start_time, endTime: d.end_time, note: d.note }, after: { date, name, employee, room, startTime, endTime, note } });
         res.json({ ok: true });
     } catch (err) { res.json({ ok: false, msg: "更新失敗：" + err.message }); }
 });
@@ -229,7 +230,7 @@ app.post('/api/reservations/batch', async (req, res) => {
                         [item.room, itemEnd, item.endTime, item.date, item.startTime]
                     );
                     if (conflict.rows.length > 0) { fail++; failDetails.push(`第${item.row||'?'}行「${item.name}」${item.date} ${item.startTime}-${item.endTime} ${item.room} 時段已被 ${conflict.rows[0].employee} 預約`); continue; }
-                    await client.query(`INSERT INTO reservations (res_date,title,employee,room_name,start_time,end_time,end_date) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [item.date, item.name, item.employee, item.room, item.startTime, item.endTime, item.endDate || item.date]);
+                    await client.query(`INSERT INTO reservations (res_date,title,employee,room_name,start_time,end_time,end_date,note) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [item.date, item.name, item.employee, item.room, item.startTime, item.endTime, item.endDate || item.date, item.note || '']);
                     ok++;
                 } else {
                     ok++;

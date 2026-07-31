@@ -68,6 +68,7 @@ let eventsData = [];
 let selectedDateStr = ""; 
 let currentViewIndex = -1; // 用於追蹤當前查看的事件索引
 let currentImportSkipList = [];
+let currentImportInfoList = [];
 
 // 新增：回收站（從後端載入 is_deleted=1 的房間）
 let trashRoomList = [];
@@ -193,6 +194,9 @@ function showPasswordPrompt(message){
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    if (window.__CAL_BOOKING_INIT_DONE__) { console.warn('[INIT] 已初始化過，跳過重複執行'); return; }
+    window.__CAL_BOOKING_INIT_DONE__ = true;
+    console.log('[IMPORT] script version v20260731c (importArmed gate)');
     loadAllData();
     renderAnnouncement();
     initFilterDropdowns();
@@ -292,6 +296,45 @@ if(btnDeleteDetail){
         }
     };
 }
+// 詳情視窗內的 查看備註
+const btnViewNote = document.getElementById('btnViewNote');
+if(btnViewNote){
+    btnViewNote.onclick = () => {
+        const ev = eventsData[currentViewIndex];
+        document.getElementById('noteText').innerText = (ev && ev.note) ? ev.note : '（無備註）';
+        document.getElementById('noteModal').classList.add('active');
+    };
+}
+
+// 複製備註（含 Windows/非 HTTPS 環境 fallback）
+function copyTextToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text).then(() => true, () => false);
+    }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.top = '-9999px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    let success = false;
+    try { success = document.execCommand('copy'); } catch(e) { success = false; }
+    document.body.removeChild(ta);
+    return Promise.resolve(success);
+}
+const copyNoteBtn = document.getElementById('copyNoteBtn');
+if(copyNoteBtn){
+    copyNoteBtn.onclick = async () => {
+        const text = document.getElementById('noteText').innerText;
+        const ok = await copyTextToClipboard(text);
+        copyNoteBtn.textContent = ok ? '已複製！' : '複製失敗，請手動選取文字複製';
+        setTimeout(() => { copyNoteBtn.textContent = 'Copy'; }, 2000);
+    };
+}
+
 // 一次性載入預約、房間、員工全域數據
 async function loadAllData() {
     showLoading();
@@ -409,10 +452,13 @@ function getFilteredData() {
     const importFileInput = document.getElementById('importFileInput');
     const importTipBtn = document.querySelector('.import-tip-btn');
 
+    let importArmed = false;
     if(importBtn){
     importBtn.onclick = () => {
-        // 每次點擊匯入，清空上一次的跳過記錄
+        // 每次點擊匯入，清空上一次的跳過與提醒記錄
     currentImportSkipList = [];
+    currentImportInfoList = [];
+        importArmed = true;
         importFileInput.click();
     };
     }
@@ -422,6 +468,12 @@ function getFilteredData() {
         e.stopPropagation();
         // 固定前置格式說明，每次點擊都顯示
         let tipText = "【Excel匯入格式規範】\n支援多Sheet匯入，系統會自動偵測每個Sheet的欄位：\n\n📋 Sheet 1「預約」欄位：日期、活動名稱、預約員工、房間、開始時間、結束時間（跨日預約結束時間早於開始時間時自動視為隔日結束）\n📋 Sheet 2「待辦事項」欄位：標題、開始日期、結束日期、開始時間、結束時間、房間、負責人、全日\n📋 Sheet 3「公眾假期」由系統自動抓取，無需匯入\n📋 Sheet 4「員工假期」欄位：員工姓名、開始日期、結束日期(同日=單日)、假期類型(選填)\n\n時間格式：09:00、23:30\n日期格式：2026-01-15\n\n";
+
+        if(currentImportInfoList.length > 0){
+            tipText += "=== 本次匯入資訊提醒 ===\n\n";
+            tipText += currentImportInfoList.join("\n");
+            tipText += "\n\n";
+        }
 
         if(currentImportSkipList.length > 0){
             // 有異常：規範 + 完整錯誤清單
@@ -435,19 +487,39 @@ function getFilteredData() {
     };
 }
 
+    let importProcessing = false;
+    let lastImportFp = '';
+    let importLastTime = 0;
+    let importRunId = 0;
     importFileInput.addEventListener('change', async (e) => {
+        const now = Date.now();
+        console.log(`[IMPORT] change 觸發 armed=${importArmed} time=${now} lastTime=${importLastTime} diff=${now-importLastTime}`);
+        if (!importArmed) { console.warn('[IMPORT] 已阻擋非使用者觸發的檔案變更'); return; }
+        importArmed = false;
         const file = e.target.files[0];
         if (!file) return;
+        const fp = `${file.name}|${file.size}|${file.lastModified}`;
+        if (importProcessing) { console.warn('[IMPORT] 已阻擋重複觸發（處理中）:', fp); return; }
+        if (fp === lastImportFp && Date.now() - importLastTime < 1500) { console.warn('[IMPORT] 已阻擋短時間內相同檔案重複觸發:', fp); return; }
+        lastImportFp = fp;
+        importLastTime = Date.now();
+        importProcessing = true;
+        importRunId++;
+        const runId = importRunId;
+        console.log(`[IMPORT] 開始處理 runId=${runId} fp=${fp}`);
         
         const reader = new FileReader();
         reader.onload = async function(evt) {
             try {
+                console.log(`[IMPORT] runId=${runId} 檔案讀取完成，開始解析`);
                 const data = new Uint8Array(evt.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
                 await loadAllData();
                 
                 let totalSuccess = 0, totalSkip = 0, newRoomCount = 0, newEmpCount = 0;
                 const allSkipList = [];
+                const allInfoNotes = [];
+                let todoDataRowsFound = false;
                 const allNewRooms = new Set();
                 const allNewEmps = new Set();
 
@@ -470,6 +542,7 @@ function getFilteredData() {
                             else if (key === '房間' || key === 'room') headerMap.room = i;
                             else if (key === '開始時間' || key === 'startTime' || key === 'start') headerMap.startTime = i;
                             else if (key === '結束時間' || key === 'endTime' || key === 'end') headerMap.endTime = i;
+                            else if (key === '備註' || key === 'note') headerMap.note = i;
                         });
                         const importList = [];
                         rawData.slice(1).forEach((row, rawIdx) => {
@@ -478,6 +551,7 @@ function getFilteredData() {
                             const get = (key) => headerMap[key] !== undefined ? row[headerMap[key]] : undefined;
                             const dateRaw = get('date'); const name = get('name'); const employee = get('employee');
                             const room = get('room'); const startRaw = get('startTime'); const endRaw = get('endTime');
+                            const note = headerMap.note !== undefined ? String(row[headerMap.note] ?? '').trim() : '';
                             if (dateRaw === undefined || !name || !employee || !room || startRaw === undefined || endRaw === undefined) {
                                 totalSkip++; allSkipList.push(`[預約]第${excelRow}行：欄位不全`); return;
                             }
@@ -497,7 +571,7 @@ function getFilteredData() {
                                 return ev.room === roomName && (dateStr+'T'+sTime) < (evEnd+'T'+ev.endTime) && (importEndDate+'T'+eTime) > (ev.date+'T'+ev.startTime);
                             });
                             if (isConflict) { totalSkip++; allSkipList.push(`[預約]第${excelRow}行「${name}」：${dateStr} ${roomName} 時段衝突`); return; }
-                            importList.push({ date: dateStr, endDate: importEndDate, name: String(name).trim(), employee: empName, room: roomName, startTime: sTime, endTime: eTime, row: excelRow });
+                            importList.push({ date: dateStr, endDate: importEndDate, name: String(name).trim(), employee: empName, room: roomName, startTime: sTime, endTime: eTime, note, row: excelRow });
                             totalSuccess++;
                         });
                         if (importList.length > 0) {
@@ -506,6 +580,7 @@ function getFilteredData() {
 
                     } else if (headers.includes('標題') || headers.includes('開始日期')) {
                         // === TODO SHEET ===
+                        todoDataRowsFound = true;
                         const headerMap = {};
                         headerRow.forEach((h, i) => {
                             const key = String(h || '').trim();
@@ -522,7 +597,7 @@ function getFilteredData() {
                             if (!row || row.every(c => c === null || c === undefined || String(c).trim() === '')) continue;
                             const get = (key) => headerMap[key] !== undefined ? row[headerMap[key]] : undefined;
                             const title = get('title'); const startDateRaw = get('startDate');
-                            if (!title || !startDateRaw) { totalSkip++; allSkipList.push(`[待辦]缺少標題或開始日期`); continue; }
+                            if (!title || !startDateRaw) { allInfoNotes.push(`[待辦]缺少標題或開始日期`); continue; }
                             const startDate = excelDateToStr(startDateRaw);
                             const endDateRaw = get('endDate'); const endDate = endDateRaw ? excelDateToStr(endDateRaw) : startDate;
                             const startTime = get('startTime') ? excelTimeToStr(get('startTime')) : '';
@@ -542,7 +617,7 @@ function getFilteredData() {
                         }
 
                     } else if (headers.includes('名稱') && headers.includes('日期') && !headers.includes('活動名稱')) {
-                        totalSkip++; allSkipList.push(`[假期]假期資料由系統自動抓取，無需匯入`);
+                        allInfoNotes.push('[假期]假期資料由系統自動抓取，無需匯入');
 
                     } else if (headers.includes('員工姓名') && (headers.includes('日期') || headers.includes('開始日期'))) {
                         // === EMPLOYEE LEAVE SHEET ===
@@ -575,32 +650,38 @@ function getFilteredData() {
                             try { const res = await fetch(`${API_BASE}/employee-leaves/batch`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({list:leaveList}) }); const result = await res.json(); if (!result.ok) { totalSkip += leaveList.length; allSkipList.push("[員工假期]批量匯入失敗："+result.msg); } else if (result.fail > 0) { totalSuccess -= result.fail; totalSkip += result.fail; } } catch(err) { totalSkip += leaveList.length; allSkipList.push("[員工假期]批量匯入失敗："+err.message); }
                         }
                     }
-                for (const rName of allNewRooms) { try { const color = generateRandomRoomColor(); await fetch(`${API_BASE}/rooms`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({name:rName,short:'',colorData:JSON.stringify(color)}) }); } catch(e) {} }
-                for (const eName of allNewEmps) { try { await fetch(`${API_BASE}/employees`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({name:eName}) }); } catch(e) {} }
+            }
+            for (const rName of allNewRooms) { try { const color = generateRandomRoomColor(); await fetch(`${API_BASE}/rooms`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({name:rName,short:'',colorData:JSON.stringify(color)}) }); } catch(e) {} }
+            for (const eName of allNewEmps) { try { await fetch(`${API_BASE}/employees`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({name:eName}) }); } catch(e) {} }
 
-                await loadAllData();
-                await loadHolidays(new Date().getFullYear());
-                updateView();
-                
-                currentImportSkipList = [...allSkipList];
-                let resultMsg = `匯入完成！\n✅ 成功：${totalSuccess} 條\n⚠️ 跳過：${totalSkip} 條`;
-                if (newRoomCount > 0) resultMsg += `\n🏠 自動新增房間：${newRoomCount} 個`;
-                if (newEmpCount > 0) resultMsg += `\n👤 自動新增員工：${newEmpCount} 位`;
-                if (allSkipList.length > 0) {
-                    resultMsg += totalSuccess === 0
-                        ? `\n\n⚠️ 所有數據均跳過，極可能Excel欄位格式不匹配！\n點擊匯入旁邊「i」小按鈕查看完整錯誤原因`
-                        : `\n\n點擊匯入旁邊「i」小按鈕可查看全部跳過異常明細`;
-                }
-                alert(resultMsg);
+            await loadAllData();
+            await loadHolidays(new Date().getFullYear());
+            updateView();
 
-                }
-            } catch (err) {
+            if (!todoDataRowsFound) allInfoNotes.push('[待辦]未加入待辦事項');
+            currentImportInfoList = [...allInfoNotes];
+            currentImportSkipList = [...allSkipList];
+            let resultMsg = `匯入完成！\n✅ 成功：${totalSuccess} 條\n⚠️ 跳過：${totalSkip} 條`;
+            if (newRoomCount > 0) resultMsg += `\n🏠 自動新增房間：${newRoomCount} 個`;
+            if (newEmpCount > 0) resultMsg += `\n👤 自動新增員工：${newEmpCount} 位`;
+            if (allInfoNotes.length > 0) resultMsg += `\nℹ️ 資訊提醒：${allInfoNotes.length} 條（點「i」查看）`;
+            if (allSkipList.length > 0) {
+                resultMsg += totalSuccess === 0
+                    ? `\n\n⚠️ 所有數據均跳過，極可能Excel欄位格式不匹配！\n點擊匯入旁邊「i」小按鈕查看完整錯誤原因`
+                    : `\n\n點擊匯入旁邊「i」小按鈕可查看全部跳過異常明細`;
+            }
+            resultMsg += `\n\n[DEBUG runId=${runId} v20260731e]`;
+            console.log(`[IMPORT] runId=${runId} 顯示結果 alert：成功=${totalSuccess} 跳過=${totalSkip}`);
+            alert(resultMsg);
+        } catch (err) {
                 console.error(err);
                 alert("匯入失敗：檔案格式錯誤，請確認是標準 .xlsx 檔案");
+            } finally {
+                importFileInput.value = "";
+                importProcessing = false;
             }
-            
-            importFileInput.value = "";
         };
+        reader.onerror = () => { importFileInput.value = ""; importProcessing = false; };
         reader.readAsArrayBuffer(file);
     });
 
@@ -1043,11 +1124,15 @@ document.querySelectorAll('.short-input').forEach(input=>{
             const room = document.getElementById('todoRoom').value;
             const employee = document.getElementById('todoEmployee').value;
             const isAllDay = document.getElementById('todoAllDay').checked;
+            const selectedDays = Array.from(document.querySelectorAll('.todo-dow:checked')).map(cb => parseInt(cb.value));
             if (!title || !startDate || !endDate) return alert('請填寫標題和日期');
             if (endDate < startDate) return alert('結束日期不能早於開始日期');
             if (!room || !employee) {
                 const msg = !room && !employee ? '未指定房間及員工' : !room ? '未指定房間' : '未指定員工';
                 if (!confirm(`${msg}，是否繼續？`)) return;
+            }
+            if (!isAllDay && selectedDays.length === 0) {
+                if (!confirm('未指定全日及重複星期，將僅建立單一筆待辦事項，是否繼續？')) return;
             }
 
             todoBusy = true;
@@ -1067,7 +1152,6 @@ document.querySelectorAll('.short-input').forEach(input=>{
                 } else {
                     // Add mode
                     addTodoBtn.textContent = '新增中...';
-                    const selectedDays = Array.from(document.querySelectorAll('.todo-dow:checked')).map(cb => parseInt(cb.value));
 
                     if (selectedDays.length === 0) {
                         const res = await fetch(`${API_BASE}/todos`, {
@@ -1485,7 +1569,7 @@ function renderEventsIntoColumn(columnElement, dateStr) {
                     white-space:nowrap;
                     text-overflow:ellipsis;
                 `;
-                evEl.innerHTML = `<strong>${displayStart}</strong> ${ev.name}｜${dispRoom}`;
+                evEl.innerHTML = `<strong>${ev.startTime}</strong> ${ev.name}｜${dispRoom}`;
                 evEl.onclick = (e) => {
                     e.stopPropagation();
                     const targetIndex = eventsData.findIndex(item => item === ev);
@@ -1631,6 +1715,8 @@ function showEventDetails(index) {
     document.getElementById('viewEventRoom').innerText = ev.room;
     document.querySelector('#viewEventEmployee span').innerText = ev.employee;
     document.getElementById('detailBar').style.backgroundColor = style.border;
+    const noteWrap = document.getElementById('viewEventNoteWrap');
+    if (noteWrap) noteWrap.style.display = ev.note ? 'block' : 'none';
     viewDetailModal.classList.add('active');
 }
 
@@ -1734,6 +1820,7 @@ function openBookingForm(dateStr, index = -1) {
         if(roomList.length > 0){
             roomSelect.value = roomList[0].name;
         }
+        document.getElementById("eventNote").value = "";
     } else {
         const ev = eventsData[index];
         formTitle.innerText = `編輯預約 (${dateStr})`;
@@ -1741,6 +1828,7 @@ function openBookingForm(dateStr, index = -1) {
         document.getElementById("employeeName").value = ev.employee;
         document.getElementById("startTime").value = ev.startTime;
         document.getElementById("endTime").value = ev.endTime;
+        document.getElementById("eventNote").value = ev.note || '';
 
         // 回填房間下拉
         const optMatch = Array.from(roomSelect.options).find(o => o.value === ev.room);
@@ -1831,6 +1919,7 @@ bookBtn.onclick = async (e) => {
     const startTime = cleanTime(startTimeRaw);
     const endTime = cleanTime(endTimeRaw);
     const date = cleanStr(selectedDateStr);
+    const note = document.getElementById("eventNote").value.trim();
     console.log("[BOOK] cleaned:", {name, employee, room, startTime, endTime, date});
 
     // 3. 基礎空值攔截
@@ -1862,7 +1951,8 @@ bookBtn.onclick = async (e) => {
         employee: employee,
         room: room,
         startTime: startTime,
-        endTime: endTime
+        endTime: endTime,
+        note: note
     };
     console.log("[BOOK] payload:", JSON.stringify(newEv));
 
@@ -2002,10 +2092,10 @@ function exportExcel(range){
     const book = XLSX.utils.book_new();
 
     // Sheet 1: 預約（僅預約，不含待辦事項與員工假期；結束日期由系統依時間自動判斷）
-    const resData = [["日期","活動名稱","預約員工","房間","開始時間","結束時間"]];
+    const resData = [["日期","活動名稱","預約員工","房間","開始時間","結束時間","備註"]];
     data.forEach(ev=>{
         if (ev._type) return;
-        resData.push([ev.date, ev.name, ev.employee, ev.room, ev.startTime, ev.endTime])
+        resData.push([ev.date, ev.name, ev.employee, ev.room, ev.startTime, ev.endTime, ev.note || ''])
     })
     XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(resData), "預約");
 

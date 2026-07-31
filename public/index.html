@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=20260731b" />
   <title>大月曆預約系統</title>
 </head>
 <body>
@@ -280,7 +280,27 @@
         <p id="viewEventTime">時間</p>
         <p id="viewEventRoom" class="detail-room-tag">房間</p>
         <p id="viewEventEmployee" style="color: #666;">預約同事：<span></span></p>
+        <p id="viewEventNoteWrap" style="display:none;margin-top:10px;">
+          <button id="btnViewNote" class="btn-view-note">查看備註</button>
+        </p>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="noteModal">
+  <div class="add-event-wrapper" style="width:480px;max-width:90vw;">
+    <div class="modal-header">
+      <h3>備註</h3>
+      <div class="header-right">
+      <button class="btn-close-view" title="Close">
+        <i class="fa-solid fa-xmark"></i>
+    </button>
+    </div>
+    </div>
+    <div class="add-event-body">
+      <div id="noteText" class="note-text"></div>
+      <button id="copyNoteBtn" class="btn-add-main" style="width:100%;">Copy</button>
     </div>
   </div>
 </div>
@@ -458,11 +478,14 @@
     </select>
   </div>
 </div>
+      <div class="input-group">
+  <label>備註（選填）</label>
+  <textarea id="eventNote" rows="2" placeholder="例如：會議 Zoom 連結"></textarea>
+</div>
       <button class="btn-book">確認預約</button>
     </div>
   </div>
 </div>
-
   <!-- 代辦事項彈窗 -->
   <div class="modal-overlay" id="todosModal">
     <div class="add-event-wrapper" style="width:560px;max-width:90vw;">
@@ -545,7 +568,7 @@
           <label style="cursor:pointer;"><input type="checkbox" id="todoAllDay" style="margin-right:6px;"> 全日（不指定時間）</label>
         </div>
         <div class="input-group">
-          <label>重複（多選星期幾，於日期範圍內重複建立）</label>
+          <label>重複（可多選，於日期範圍內重複建立）</label>
           <div id="todoWeekdays" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">
             <label style="cursor:pointer;font-size:13px;"><input type="checkbox" class="todo-dow" value="1"> 週一</label>
             <label style="cursor:pointer;font-size:13px;"><input type="checkbox" class="todo-dow" value="2"> 週二</label>
@@ -594,7 +617,7 @@
     <div class="loading-text">載入中…</div>
   </div>
 
-  <script src="script.js"></script>
+  <script src="script.js?v=20260731g"></script>
 </body>
 </html>
 

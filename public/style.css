@@ -95,6 +95,7 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
+  min-width: 0; /* 防止內容最小寬度撐爆容器，導致側欄被左溢位裁切 */
 }
 
 /* 隱藏/顯示控制 */
@@ -151,6 +152,7 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   position: relative;
   background: white;
   padding-top: 10px;
+  min-width: 0;
 }
 
 .time-column {
@@ -177,33 +179,45 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 
 /* 分開寫，不要合併選擇器 */
 .day-column {
-
     position: relative;
     border-right: 1px solid #eee;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.day-column-allDay {
+    height: 84px;
+    overflow-y: auto;
+    background: #fdfbf5;
+    border-bottom: 1px solid #ddd;
+    padding: 2px 4px;
+    box-sizing: border-box;
+    position: sticky;
+    top: 0;
+    z-index: 15;
+}
+.day-column-body {
+    position: relative;
     min-height: 1410px;
     background-image: linear-gradient(#f0f0f0 1px, transparent 1px);
     background-size: 100% 60px;
     margin-top: 0;
 }
-.timeline-extras {
-  display: grid;
-  background: #fafafa;
-  border-top: 1px solid #ddd;
-  font-size: 10px;
-}
-.extras-gutter {
-  width: 60px;
-}
-.extras-cell {
-  padding: 4px 6px;
-  border-right: 1px solid #eee;
-  min-height: 20px;
+.time-gutter-allDay {
+    height: 84px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #999;
+    border-bottom: 1px solid #ddd;
 }
 
 .event-grid {
   flex-grow: 1;
   position: relative;
   min-height: 1410px;
+  min-width: 0;
   background-image: linear-gradient(to bottom, #e0e0e0 1px, transparent 1px);
   background-size: 100% 60px;
   background-attachment: local;
@@ -373,10 +387,12 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   height: 100%;
   background: rgba(0, 0, 0, 0.5); /* 半透明黑背景 */
   justify-content: center; 
-  align-items: center; 
+  align-items: flex-start;
+  overflow-y: auto; /* 內容過高時可捲動，避免頂端叉號被裁切 */
   z-index: 9999; /* 提高層級，確保不被其他容器遮擋 */
 }
 .modal-overlay.active { display: flex; }
+.modal-overlay.active > * { margin: auto; }
 .add-event-wrapper { background: white; padding: 20px; border-radius: 8px; width: 400px; }
 .input-group { margin-bottom: 15px; }
 .input-group label { display: block; margin-bottom: 5px; font-size: 14px; }
@@ -612,6 +628,7 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 #mainViewContainer {
   flex: 1 1 1400px;
   max-width: 1400px;
+  min-width: 0; /* 允許收縮以符合可用寬度，避免撐破容器 */
   transition: max-width 0.2s;
 }
 /* 側欄收合 */

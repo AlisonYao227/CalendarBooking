@@ -8,7 +8,7 @@
 
 body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding: 10px 10px; overflow-x: hidden; scrollbar-gutter: stable; }
 
-.main-container { max-width: 1200px; margin: 0 auto; background: #fff; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); overflow: hidden; }
+.main-container { max-width: 1570px; margin: 0 auto; background: #fff; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); overflow: hidden; }
 
 *{
   box-sizing: border-box;
@@ -120,7 +120,7 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 }
 
 
-.days { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 150px; } /* 每一格固定 150px 高 */
+.days { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 175px; } /* 每一格固定 175px 高 */
 
 .day {
   border: 0.5px solid var(--border-color);

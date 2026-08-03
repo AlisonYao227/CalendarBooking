@@ -467,7 +467,7 @@ function getFilteredData() {
     importTipBtn.onclick = (e) => {
         e.stopPropagation();
         // 固定前置格式說明，每次點擊都顯示
-        let tipText = "【Excel匯入格式規範】\n支援多Sheet匯入，系統會自動偵測每個Sheet的欄位：\n\n📋 Sheet 1「預約」欄位：日期、活動名稱、預約員工、房間、開始時間、結束時間（跨日預約結束時間早於開始時間時自動視為隔日結束）\n📋 Sheet 2「待辦事項」欄位：標題、開始日期、結束日期、開始時間、結束時間、房間、負責人、全日\n📋 Sheet 3「公眾假期」由系統自動抓取，無需匯入\n📋 Sheet 4「員工假期」欄位：員工姓名、開始日期、結束日期(同日=單日)、假期類型(選填)\n\n時間格式：09:00、23:30\n日期格式：2026-01-15\n\n";
+        let tipText = "【Excel匯入格式規範】\n支援多Sheet匯入，系統會自動偵測每個Sheet的欄位：\n\n📋 Sheet 1「預約」欄位：日期、活動名稱、預約員工、房間、開始時間、結束時間（跨日預約結束時間早於開始時間時自動視為隔日結束）\n📋 舊版「預約」格式亦支援：日期（含星期）、活動名、時段（全日/am/pm）、房間、負責人\n📋 Sheet 2「待辦事項」欄位：標題、開始日期、結束日期、開始時間、結束時間、房間、負責人、全日\n📋 Sheet 3「公眾假期」由系統自動抓取，無需匯入\n📋 Sheet 4「員工假期」欄位：員工姓名、開始日期、結束日期(同日=單日)、假期類型(選填)\n\n時間格式：09:00、23:30\n日期格式：2026-01-15（舊格式亦支援 1/03/2025（Fri））\n\n";
 
         if(currentImportInfoList.length > 0){
             tipText += "=== 本次匯入資訊提醒 ===\n\n";
@@ -531,7 +531,47 @@ function getFilteredData() {
                     const headerRow = rawData[0];
                     const headers = headerRow.map(h => String(h || '').trim().toLowerCase());
 
-                    if (headers.includes('活動名稱') || headers.includes('預約員工') || headers.includes('預約人')) {
+                    if (headers.includes('時段') && (headers.includes('活動名') || headers.includes('活動名稱')) && headers.includes('房間') && !headers.includes('開始時間')) {
+                        // === 舊格式預約 SHEET（日期含星期／活動名／時段／房間／負責人） ===
+                        const headerMap = {};
+                        headerRow.forEach((h, i) => {
+                            const key = String(h || '').trim();
+                            if (key === '日期' || key === 'date') headerMap.date = i;
+                            else if (key === '活動名' || key === '活動名稱' || key === 'name') headerMap.name = i;
+                            else if (key === '時段' || key === 'session') headerMap.session = i;
+                            else if (key === '房間' || key === 'room') headerMap.room = i;
+                            else if (key === '負責人' || key === 'employee') headerMap.employee = i;
+                        });
+                        const importList = [];
+                        rawData.slice(1).forEach((row, rawIdx) => {
+                            const excelRow = rawIdx + 2;
+                            if (!row || row.every(c => c === null || c === undefined || String(c).trim() === '')) return;
+                            const get = (key) => headerMap[key] !== undefined ? row[headerMap[key]] : undefined;
+                            const dateRaw = get('date'); const name = get('name'); const employee = get('employee');
+                            const room = get('room'); const sessionRaw = get('session');
+                            if (dateRaw === undefined || !name || !employee || !room || sessionRaw === undefined) {
+                                totalSkip++; allSkipList.push(`[預約]第${excelRow}行：欄位不全`); return;
+                            }
+                            const dateStr = legacyDateToStr(dateRaw);
+                            if (!dateStr) { totalSkip++; allSkipList.push(`[預約]第${excelRow}行「${name}」：日期格式無法辨識「${dateRaw}」`); return; }
+                            const slot = sessionToTimes(sessionRaw);
+                            if (!slot) { totalSkip++; allSkipList.push(`[預約]第${excelRow}行「${name}」：時段「${sessionRaw}」無法辨識（請用 全日/am/pm）`); return; }
+                            const roomName = String(room).trim(); const empName = String(employee).trim();
+                            if (!roomList.some(item => item.name === roomName) && !allNewRooms.has(roomName)) { allNewRooms.add(roomName); newRoomCount++; }
+                            if (!empList.some(e => e.name === empName) && !allNewEmps.has(empName)) { allNewEmps.add(empName); newEmpCount++; }
+                            const isConflict = eventsData.some(ev => {
+                                const evEnd = ev.endDate || ev.date;
+                                return ev.room === roomName && (dateStr+'T'+slot.sTime) < (evEnd+'T'+ev.endTime) && (dateStr+'T'+slot.eTime) > (ev.date+'T'+ev.startTime);
+                            });
+                            if (isConflict) { totalSkip++; allSkipList.push(`[預約]第${excelRow}行「${name}」：${dateStr} ${roomName} 時段衝突`); return; }
+                            importList.push({ date: dateStr, endDate: dateStr, name: String(name).trim(), employee: empName, room: roomName, startTime: slot.sTime, endTime: slot.eTime, note: '', row: excelRow });
+                            totalSuccess++;
+                        });
+                        if (importList.length > 0) {
+                            try { const res = await fetch(`${API_BASE}/reservations/batch`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({list:importList}) }); const result = await res.json(); if (!result.ok) { totalSkip += importList.length; allSkipList.push("[預約]批量匯入失敗："+result.msg); } else if (result.fail > 0) { totalSuccess -= result.fail; totalSkip += result.fail; if (result.failDetails) result.failDetails.forEach(d => allSkipList.push("[預約]"+d)); } } catch(err) { totalSkip += importList.length; allSkipList.push("[預約]批量匯入失敗："+err.message); }
+                        }
+
+                    } else if (headers.includes('活動名稱') || headers.includes('預約員工') || headers.includes('預約人')) {
                         // === RESERVATION SHEET ===
                         const headerMap = {};
                         headerRow.forEach((h, i) => {
@@ -1797,6 +1837,14 @@ function openBookingForm(dateStr, index = -1) {
     // ====== 編輯模式回填 ======
     const startTimeEl = document.getElementById("startTime");
     const endTimeEl = document.getElementById("endTime");
+    document.querySelectorAll('.time-slot-btn').forEach(btn => {
+        btn.onclick = () => {
+            const slot = btn.dataset.slot;
+            const map = { all: ['00:00','23:30'], am: ['09:00','12:00'], pm: ['13:00','18:00'] };
+            const [s, e] = map[slot] || [];
+            if (s) { startTimeEl.value = s; endTimeEl.value = e; }
+        };
+    });
     startTimeEl.onchange = () => {
         const [sh, sm] = startTimeEl.value.split(':').map(Number);
         let eh = sh + 1;
@@ -2545,6 +2593,63 @@ function excelDateToStr(dateVal) {
         return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     }
     return str;
+}
+
+// 舊格式日期（含星期，如「1/03/2025（Fri）」）轉 YYYY-MM-DD；用星期自動驗證 月/日 順序
+function legacyDateToStr(dateVal) {
+    if (typeof dateVal === 'number') return excelDateToStr(dateVal);
+    let str = String(dateVal).trim();
+    if (!str) return null;
+    if (/^\d{4}-\d{1,2}-\d{1,2}/.test(str)) return str.slice(0, 10);
+    const m = str.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (!m) return null;
+    const a = parseInt(m[1], 10), b = parseInt(m[2], 10), y = parseInt(m[3], 10);
+    const statedDow = extractWeekdayIndex(str);
+    const primary = buildDateStr(y, a, b);
+    if (primary) {
+        if (statedDow === null || getWeekdayIndex(primary) === statedDow) return primary;
+        const swapped = buildDateStr(y, b, a);
+        if (swapped && getWeekdayIndex(swapped) === statedDow) return swapped;
+        return primary;
+    }
+    const swapped = buildDateStr(y, b, a);
+    return swapped || null;
+}
+
+function buildDateStr(y, mo, d) {
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+    const dt = new Date(Date.UTC(y, mo - 1, d));
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null;
+    return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+function getWeekdayIndex(dateStr) {
+    return new Date(dateStr + 'T00:00:00').getDay();
+}
+
+function extractWeekdayIndex(str) {
+    const s = String(str).toLowerCase();
+    const names = ['sun','mon','tue','wed','thu','fri','sat'];
+    for (let i = 0; i < names.length; i++) {
+        if (s.includes(names[i])) return i;
+    }
+    if (s.includes('星期日') || s.includes('星期天') || s.includes('週日') || s.includes('周日')) return 0;
+    if (s.includes('星期一') || s.includes('週一') || s.includes('周一')) return 1;
+    if (s.includes('星期二') || s.includes('週二') || s.includes('周二')) return 2;
+    if (s.includes('星期三') || s.includes('週三') || s.includes('周三')) return 3;
+    if (s.includes('星期四') || s.includes('週四') || s.includes('周四')) return 4;
+    if (s.includes('星期五') || s.includes('週五') || s.includes('周五')) return 5;
+    if (s.includes('星期六') || s.includes('週六') || s.includes('周六')) return 6;
+    return null;
+}
+
+// 舊格式時段（全日/am/pm）轉開始/結束時間
+function sessionToTimes(sessionVal) {
+    const v = String(sessionVal || '').trim().toLowerCase();
+    if (v === '全日' || v === '全天' || v === 'full' || v === 'allday' || v === 'all day') return { sTime: '00:00', eTime: '23:30' };
+    if (v === 'am' || v === '上午' || v === '早上' || v === 'morning') return { sTime: '09:00', eTime: '12:00' };
+    if (v === 'pm' || v === '下午' || v === 'afternoon') return { sTime: '13:00', eTime: '18:00' };
+    return null;
 }
 
 // 取得日曆顯示用房間文字：有縮寫顯示縮寫，否則全名；不在roomList內一律全名

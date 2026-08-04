@@ -83,23 +83,25 @@ let filterEmployee = "";
 let filterRoom = "";
 
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+// 梵高油畫風格房間配色：互補色對比鮮明（紅綠/藍橙/黃紫），取深色系以確保白字可讀、觀感舒適
+const ROOM_PALETTE = [
+  "#d32f2f", "#c2185b", "#ad1457", "#e64a19", "#ef6c00",
+  "#b8860b", "#827717", "#2e7d32", "#43a047", "#00897b",
+  "#00838f", "#0277bd", "#1565c0", "#303f9f", "#5e35b1",
+  "#7b1fa2", "#6d4c41", "#455a64", "#00695c"
+];
+
 // 房間配色持久化存儲
 let roomColorMap = {
-  "Classroom 1": { bg: "#ede7f6", border: "#673ab7", label: "#673ab7" },
-  "Classroom 2": { bg: "#e8eaf6", border: "#5c6bc0", label: "#5c6bc0" },
-  "VIP Room":    { bg: "#f3e5f5", border: "#ab47bc", label: "#ab47bc" },
-  "EDS":         { bg: "#ede7f6", border: "#7e57c2", label: "#7e57c2" }
+  "Classroom 1": { bg: "#1565c020", border: "#1565c0", label: "#1565c0" },
+  "Classroom 2": { bg: "#ef6c0020", border: "#ef6c00", label: "#ef6c00" },
+  "VIP Room":    { bg: "#ad145720", border: "#ad1457", label: "#ad1457" },
+  "EDS":         { bg: "#00897b20", border: "#00897b", label: "#00897b" }
 };
 
 // 隨機生成房間配色函數【修復版：先順序取用未使用顏色，用完才循環】
 function generateRandomRoomColor() {
-  const colorPool = [
-    "#7e57c2", "#673ab7", "#5c6bc0", "#9575cd", "#7986cb",
-    "#ab47bc", "#8e24aa", "#ba68c8", "#ce93d8", "#9c27b0",
-    "#7c4dff", "#651fff", "#b388ff", "#536dfe", "#6c757d",
-    "#5c6bc0", "#3f51b5", "#7986cb", "#9fa8da", "#5c6bc0",
-    "#4a148c", "#6a1b9a", "#8e24aa", "#ab47bc", "#ce93d8"
-  ];
+  const colorPool = ROOM_PALETTE;
 
   // 取出所有已經被佔用的 border 色
   const usedColors = Object.values(roomColorMap).map(item => item.border);
@@ -111,7 +113,7 @@ function generateRandomRoomColor() {
     // 還有剩餘未使用顏色 → 從剩餘池隨機抽取，保證不重複
     border = availableColors[Math.floor(Math.random() * availableColors.length)];
   } else {
-    // 25種全部用完，允許重複，隨機取全部池內顏色
+    // 19種全部用完，允許重複，隨機取全部池內顏色
     border = colorPool[Math.floor(Math.random() * colorPool.length)];
   }
 
@@ -127,10 +129,10 @@ function generateRandomRoomColor() {
 function getRoomStyle(roomName) {
     // 固定內建房間白名單，永遠強制使用原生配色，不隨機生成
     const builtInRooms = {
-        "Classroom 1": { bg: "#ede7f6", border: "#673ab7", label: "#673ab7" },
-        "Classroom 2": { bg: "#e8eaf6", border: "#5c6bc0", label: "#5c6bc0" },
-        "VIP Room":    { bg: "#f3e5f5", border: "#ab47bc", label: "#ab47bc" },
-        "EDS":         { bg: "#ede7f6", border: "#7e57c2", label: "#7e57c2" }
+        "Classroom 1": { bg: "#1565c020", border: "#1565c0", label: "#1565c0" },
+        "Classroom 2": { bg: "#ef6c0020", border: "#ef6c00", label: "#ef6c00" },
+        "VIP Room":    { bg: "#ad145720", border: "#ad1457", label: "#ad1457" },
+        "EDS":         { bg: "#00897b20", border: "#00897b", label: "#00897b" }
     };
     if(builtInRooms[roomName]){
         return builtInRooms[roomName];
@@ -354,6 +356,21 @@ async function loadAllData() {
                 if (r.colorData) {
                     try { roomColorMap[r.name] = JSON.parse(r.colorData); } catch(e) {}
                 }
+            });
+            // 遷移：舊版紫/藍紫相近色系一律重配成梵高對比色系，並持久化（內建房間由 getRoomStyle 覆蓋，不在此處理）
+            const paletteSet = new Set(ROOM_PALETTE.map(c => c.toLowerCase()));
+            const builtInNames = ['Classroom 1', 'Classroom 2', 'VIP Room', 'EDS'];
+            roomList.forEach(r => {
+                if (!r.colorData || builtInNames.includes(r.name)) return;
+                let c; try { c = JSON.parse(r.colorData); } catch(e) { return; }
+                if (!c || !c.border || paletteSet.has(String(c.border).toLowerCase())) return;
+                const color = generateRandomRoomColor();
+                roomColorMap[r.name] = color;
+                if (r.id) fetch(`${API_BASE}/rooms/${r.id}/color`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ colorData: JSON.stringify(color) })
+                }).catch(() => {});
             });
         }
 
@@ -1869,7 +1886,7 @@ function openBookingForm(dateStr, index = -1) {
     document.querySelectorAll('.time-slot-btn').forEach(btn => {
         btn.onclick = () => {
             const slot = btn.dataset.slot;
-            const map = { all: ['00:00','23:30'], am: ['09:00','12:00'], pm: ['13:00','18:00'] };
+            const map = { all: ['00:00','23:30'], am: ['09:00','13:00'], pm: ['14:00','18:00'] };
             const [s, e] = map[slot] || [];
             if (s) { startTimeEl.value = s; endTimeEl.value = e; }
         };
@@ -2889,8 +2906,8 @@ function extractWeekdayIndex(str) {
 function sessionToTimes(sessionVal) {
     const v = String(sessionVal || '').trim().toLowerCase();
     if (v === '全日' || v === '全天' || v === 'full' || v === 'allday' || v === 'all day') return { sTime: '00:00', eTime: '23:30' };
-    if (v === 'am' || v === '上午' || v === '早上' || v === 'morning') return { sTime: '09:00', eTime: '12:00' };
-    if (v === 'pm' || v === '下午' || v === 'afternoon') return { sTime: '13:00', eTime: '18:00' };
+    if (v === 'am' || v === '上午' || v === '早上' || v === 'morning') return { sTime: '09:00', eTime: '13:00' };
+    if (v === 'pm' || v === '下午' || v === 'afternoon') return { sTime: '14:00', eTime: '18:00' };
     return null;
 }
 
@@ -2919,7 +2936,7 @@ function renderRoomChips() {
     const allRooms = [...roomList];
     let html = `<button class="room-chip${!filterRoom ? ' active' : ''}" data-room="" style="border-left:3px solid #ccc;"><span class="chip-dot" style="background:#ccc;"></span>全部</button>`;
     allRooms.forEach(r => {
-        const style = roomColorMap[r.name] || { bg: '#eee', border: '#999', label: '#999' };
+        const style = getRoomStyle(r.name);
         html += `<button class="room-chip${filterRoom === r.name ? ' active' : ''}" data-room="${r.name.replace(/"/g, '&quot;')}" style="border-left:3px solid ${style.border};background:${style.bg}20;">
             <span class="chip-dot" style="background:${style.border};"></span>${r.name}</button>`;
     });

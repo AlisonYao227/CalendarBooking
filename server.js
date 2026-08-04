@@ -108,7 +108,7 @@ async function initDB() {
         const hash = bcrypt.hashSync('123456', 10);
         await query(`INSERT INTO users (username, password, role) VALUES ('admin', $1, 'admin')`, [hash]);
     }
-    const builtInRooms = ['Classroom 1', 'Classroom 2', 'VIP Room', 'EDS'];
+    const builtInRooms = ['VIP Room', 'EDS'];
     for (const rName of builtInRooms) {
         const check = await query(`SELECT id FROM rooms WHERE name = $1`, [rName]);
         if (check.rows.length === 0) await query(`INSERT INTO rooms (name) VALUES ($1)`, [rName]);

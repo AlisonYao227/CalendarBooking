@@ -92,6 +92,7 @@ const ROOM_PALETTE = [
 ];
 
 // 房間配色持久化存儲
+// 注意：Classroom 1 / Classroom 2 已永久刪除，不再由 server 重新建立；以下兩項僅作為「舊預約」的穩定配色參考
 let roomColorMap = {
   "Classroom 1": { bg: "#1565c020", border: "#1565c0", label: "#1565c0" },
   "Classroom 2": { bg: "#ef6c0020", border: "#ef6c00", label: "#ef6c00" },
@@ -129,8 +130,6 @@ function generateRandomRoomColor() {
 function getRoomStyle(roomName) {
     // 固定內建房間白名單，永遠強制使用原生配色，不隨機生成
     const builtInRooms = {
-        "Classroom 1": { bg: "#1565c020", border: "#1565c0", label: "#1565c0" },
-        "Classroom 2": { bg: "#ef6c0020", border: "#ef6c00", label: "#ef6c00" },
         "VIP Room":    { bg: "#ad145720", border: "#ad1457", label: "#ad1457" },
         "EDS":         { bg: "#00897b20", border: "#00897b", label: "#00897b" }
     };
@@ -359,7 +358,7 @@ async function loadAllData() {
             });
             // 遷移：舊版紫/藍紫相近色系一律重配成梵高對比色系，並持久化（內建房間由 getRoomStyle 覆蓋，不在此處理）
             const paletteSet = new Set(ROOM_PALETTE.map(c => c.toLowerCase()));
-            const builtInNames = ['Classroom 1', 'Classroom 2', 'VIP Room', 'EDS'];
+            const builtInNames = ['VIP Room', 'EDS'];
             roomList.forEach(r => {
                 if (!r.colorData || builtInNames.includes(r.name)) return;
                 let c; try { c = JSON.parse(r.colorData); } catch(e) { return; }

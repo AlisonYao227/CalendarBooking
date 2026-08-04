@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="style.css?v=20260805a" />
+  <link rel="stylesheet" href="style.css?v=20260807a" />
   <title>大月曆預約系統</title>
 </head>
 <body>
@@ -130,9 +130,17 @@
     <select id="filterEmployee" class="filter-select" title="按員工篩選">
       <option value="">全部員工</option>
     </select>
-    <select id="filterRoom" class="filter-select" title="按房間篩選">
-      <option value="">全部房間</option>
-    </select>
+    <!-- 房間多選篩選 -->
+    <div class="multi-select" id="roomFilterMulti">
+      <button type="button" class="filter-select multi-select-btn" id="roomFilterBtn" title="按房間篩選（可多選）">
+        <span id="roomFilterLabel">全部房間</span>
+        <i class="fa-solid fa-chevron-down" style="font-size:10px;margin-left:6px;"></i>
+      </button>
+      <div class="multi-select-panel" id="roomFilterPanel" style="display:none;">
+        <label class="multi-option multi-option-all"><input type="checkbox" id="roomFilterAll" checked>全部</label>
+        <div id="roomFilterList"></div>
+      </div>
+    </div>
 
     
     <!-- 匯入Excel 按鈕+資訊提示 -->
@@ -620,6 +628,43 @@
     </div>
   </div>
 
+  <!-- 房間顏色選擇器 -->
+  <div class="modal-overlay" id="colorPickerModal">
+    <div class="color-picker-card">
+      <div class="modal-header">
+        <h3 id="colorPickerTitle">調整房間顏色</h3>
+        <div class="header-right">
+          <button class="btn-close-view" onclick="document.getElementById('colorPickerModal').classList.remove('active')"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+      <div class="add-event-body">
+        <div class="picker-gradient-wrap">
+          <div class="picker-gradient" id="pickerGradient">
+            <div class="picker-sv-white"></div>
+            <div class="picker-sv-black"></div>
+            <div class="picker-marker" id="pickerMarker"></div>
+          </div>
+        </div>
+        <div class="picker-hue-wrap">
+          <div class="picker-hue" id="pickerHue">
+            <div class="picker-hue-marker" id="pickerHueMarker"></div>
+          </div>
+        </div>
+        <div class="picker-info-row">
+          <div class="picker-preview-current" id="pickerPreviewCur"></div>
+          <div class="picker-preview-new" id="pickerPreviewNew"></div>
+          <div class="picker-hex-wrap">
+            <span class="picker-hex-hash">#</span>
+            <input type="text" id="pickerHexInput" class="picker-hex-input" maxlength="6" spellcheck="false" autocomplete="off">
+          </div>
+        </div>
+        <div class="picker-palette-label">快速色票</div>
+        <div id="colorSwatches" class="color-swatches"></div>
+        <button id="colorPickerConfirm" class="btn-add-main" style="width:100%;">確認</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 貼上預約浮動列（Outlook 式複製/貼上） -->
   <div id="pasteBar" class="paste-bar" style="display:none;">
     <div class="paste-bar-info">
@@ -637,7 +682,7 @@
     <div class="loading-text">載入中…</div>
   </div>
 
-  <script src="script.js?v=20260805b"></script>
+  <script src="script.js?v=20260807a"></script>
 </body>
 </html>
 

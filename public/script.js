@@ -74,6 +74,9 @@ let currentImportInfoList = [];
 let copiedEvent = null;
 let pasteRequested = false;
 
+// 房間顏色選擇器
+let selectedColorRoom = '';
+
 // 新增：回收站（從後端載入 is_deleted=1 的房間）
 let trashRoomList = [];
 let selectedCalendarDate = new Date(); // 記住使用者點擊/滑鼠hover的日期，預設今日
@@ -84,7 +87,10 @@ let empList = [];
 
 // 篩選狀態
 let filterEmployee = "";
-let filterRoom = "";
+let filterRooms = [];
+function _isRoomFiltered(room) {
+    return filterRooms.length > 0 && !filterRooms.includes(room);
+}
 
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 // 梵高油畫風格房間配色：互補色對比鮮明（紅綠/藍橙/黃紫），取深色系以確保白字可讀、觀感舒適
@@ -107,6 +113,115 @@ let roomColorMap = {
   "VIP Room":    { bg: "#9e516720", border: "#9e5167", label: "#9e5167" },
   "EDS":         { bg: "#3f757120", border: "#3f7571", label: "#3f7571" }
 };
+
+// localStorage 使用者自訂配色持久化（僅存使用者手動挑選過的房間）
+const _UC_KEY = 'userColorOverrides';
+function _loadUserOverrides() {
+    try {
+        const raw = localStorage.getItem(_UC_KEY);
+        if (raw) {
+            const o = JSON.parse(raw);
+            Object.keys(o).forEach(k => { roomColorMap[k] = o[k]; });
+        }
+    } catch(e) {}
+}
+function _saveUserOverride(roomName) {
+    try {
+        const raw = localStorage.getItem(_UC_KEY);
+        const o = raw ? JSON.parse(raw) : {};
+        o[roomName] = roomColorMap[roomName];
+        localStorage.setItem(_UC_KEY, JSON.stringify(o));
+    } catch(e) {}
+}
+_loadUserOverrides();
+
+// 頂部「房間」多選篩選下拉選單（全域）
+function buildRoomMultiFilter() {
+    const btn = document.getElementById('roomFilterBtn');
+    const panel = document.getElementById('roomFilterPanel');
+    const listEl = document.getElementById('roomFilterList');
+    const allCb = document.getElementById('roomFilterAll');
+    if (!btn || !panel || !listEl || !allCb) return;
+
+    // 依 roomList 重建房間勾選清單
+    listEl.innerHTML = roomList.map(r =>
+        `<label class="multi-option"><input type="checkbox" value="${r.name.replace(/"/g, '&quot;')}">${r.name}</label>`
+    ).join('');
+
+    const labelEl = document.getElementById('roomFilterLabel');
+
+    function refresh() {
+        listEl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.checked = filterRooms.includes(cb.value);
+        });
+        allCb.checked = filterRooms.length === 0;
+        labelEl.textContent = filterRooms.length === 0 ? '全部房間' : `已選 ${filterRooms.length} 間`;
+        btn.classList.toggle('has-selection', filterRooms.length > 0);
+    }
+
+    btn.onclick = (e) => {
+        e.stopPropagation();
+        const open = panel.style.display === 'block';
+        panel.style.display = open ? 'none' : 'block';
+    };
+    document.addEventListener('click', (e) => {
+        if (!panel.contains(e.target) && !btn.contains(e.target)) {
+            panel.style.display = 'none';
+        }
+    });
+
+    allCb.onchange = () => {
+        if (allCb.checked) {
+            filterRooms = [];
+            _syncRoomChips();
+        }
+        refresh();
+        updateView();
+    };
+
+    listEl.addEventListener('change', (e) => {
+        const cb = e.target;
+        if (cb.checked) {
+            if (!filterRooms.includes(cb.value)) filterRooms.push(cb.value);
+        } else {
+            filterRooms = filterRooms.filter(v => v !== cb.value);
+        }
+        refresh();
+        _syncRoomChips();
+        updateView();
+    });
+
+    refresh();
+}
+
+// 依 filterRooms 同步左側邊欄房間色塊的選取狀態（不重建）
+function _syncRoomChips() {
+    const wrap = document.getElementById('roomChips');
+    if (!wrap) return;
+    wrap.querySelectorAll('.room-chip').forEach(el => {
+        const room = el.dataset.room || '';
+        if (room === '') {
+            el.classList.toggle('active', filterRooms.length === 0);
+        } else {
+            el.classList.toggle('active', filterRooms.includes(room));
+        }
+    });
+}
+
+// 依 filterRooms 同步頂部多選下拉選單的顯示文字與勾選狀態（不重建）
+function _refreshRoomMultiFilter() {
+    const listEl = document.getElementById('roomFilterList');
+    const allCb = document.getElementById('roomFilterAll');
+    const labelEl = document.getElementById('roomFilterLabel');
+    const btn = document.getElementById('roomFilterBtn');
+    if (!listEl || !allCb || !labelEl || !btn) return;
+    listEl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = filterRooms.includes(cb.value);
+    });
+    allCb.checked = filterRooms.length === 0;
+    labelEl.textContent = filterRooms.length === 0 ? '全部房間' : `已選 ${filterRooms.length} 間`;
+    btn.classList.toggle('has-selection', filterRooms.length > 0);
+}
 
 // 隨機生成房間配色函數：先順序取用未使用色，用完才循環
 function generateRandomRoomColor() {
@@ -136,7 +251,9 @@ function generateRandomRoomColor() {
 
 // 取得房間配色，沒有就自動生成並存起來
 function getRoomStyle(roomName) {
-    // 固定內建房間白名單，永遠強制使用原生配色，不隨機生成
+    // 用戶自訂 / 已持久化的配色優先（含色彩選擇器修改過的顏色）
+    if (roomColorMap[roomName]) return roomColorMap[roomName];
+    // 內建房間初始預設（僅在 roomColorMap 尚無此房間時生效）
     const builtInRooms = {
         "VIP Room":    { bg: "#9e516720", border: "#9e5167", label: "#9e5167" },
         "EDS":         { bg: "#3f757120", border: "#3f7571", label: "#3f7571" }
@@ -453,6 +570,8 @@ async function loadAllData() {
                     body: JSON.stringify({ colorData: JSON.stringify(color) })
                 }).catch(() => {});
             });
+            // API sync 完成後，重新套用使用者自訂配色（確保使用者手動挑選的顏色不被遷移覆蓋）
+            _loadUserOverrides();
         }
 
         // 載入回收站（is_deleted=1 的房間）
@@ -486,45 +605,27 @@ async function loadAllData() {
 // 初始化篩選下拉選單
 function initFilterDropdowns() {
     const filterEmp = document.getElementById('filterEmployee');
-    const filterRoomEl = document.getElementById('filterRoom');
-    if (!filterEmp || !filterRoomEl) return;
-    
-    // 員工篩選
-    filterEmp.innerHTML = '<option value="">全部員工</option>';
-    empList.forEach(emp => {
-        const opt = document.createElement('option');
-        opt.value = emp.name;
-        opt.textContent = emp.name;
-        filterEmp.appendChild(opt);
-    });
-    
-    // 房間篩選
-    filterRoomEl.innerHTML = '<option value="">全部房間</option>';
-    roomList.forEach(room => {
-        const opt = document.createElement('option');
-        opt.value = room.name;
-        opt.textContent = room.name;
-        filterRoomEl.appendChild(opt);
-    });
-    
-    // 事件監聽
-    filterEmp.onchange = (e) => {
-        filterEmployee = e.target.value;
-        updateView();
-    };
-    filterRoomEl.onchange = (e) => {
-        filterRoom = e.target.value;
-        updateView();
-    };
+    if (filterEmp) {
+        filterEmp.innerHTML = '<option value="">全部員工</option>';
+        empList.forEach(emp => {
+            const opt = document.createElement('option');
+            opt.value = emp.name;
+            opt.textContent = emp.name;
+            filterEmp.appendChild(opt);
+        });
+        filterEmp.onchange = (e) => {
+            filterEmployee = e.target.value;
+            updateView();
+        };
+    }
+    buildRoomMultiFilter();
 }
-
-
 
 // 取得篩選後的事件列表
 function getFilteredData() {
     return eventsData.filter(ev => {
         if (filterEmployee && ev.employee !== filterEmployee) return false;
-        if (filterRoom && ev.room !== filterRoom) return false;
+        if (_isRoomFiltered(ev.room)) return false;
         return true;
     });
 }
@@ -1517,7 +1618,7 @@ function renderMonthView() {
             const isOnEndDate = evEndDate === dateStr && evEndDate !== ev.date;
             if (!isOnStartDate && !isOnEndDate) return;
             if (filterEmployee && ev.employee !== filterEmployee) return;
-            if (filterRoom && ev.room !== filterRoom) return;
+            if (_isRoomFiltered(ev.room)) return;
             const style = getRoomStyle(ev.room);
             const dispRoom = getCompactRoomText(ev.room);
             const prefix = isOnEndDate ? '[跨日] ' : '';
@@ -1528,7 +1629,7 @@ function renderMonthView() {
         todosData.forEach((todo) => {
             if (todo.startDate <= dateStr && todo.endDate >= dateStr) {
                 if (filterEmployee && todo.employee !== filterEmployee) return;
-                if (filterRoom && todo.room !== filterRoom) return;
+                if (_isRoomFiltered(todo.room)) return;
                 let timeStr = todo.isAllDay ? '' : (todo.startTime || '');
                 if (timeStr && todo.endTime) timeStr += '-' + todo.endTime;
                 let dispRoom = todo.room ? getCompactRoomText(todo.room) : '';
@@ -1645,7 +1746,7 @@ function createDayColumn(dateStr) {
 function getDayExtrasHtml(dateStr) {
     const dayTodos = (todosData || []).filter(todo => {
         if (filterEmployee && todo.employee !== filterEmployee) return false;
-        if (filterRoom && todo.room !== filterRoom) return false;
+        if (_isRoomFiltered(todo.room)) return false;
         return todo.startDate <= dateStr && todo.endDate >= dateStr;
     });
     const dayLeaves = getLeavesForDate ? getLeavesForDate(dateStr).filter(l => {
@@ -1673,7 +1774,7 @@ function renderEventsIntoColumn(columnElement, dateStr) {
         const isOnEnd = ev.endDate && ev.endDate === dateStr && ev.endDate !== ev.date;
         if (!isOnStart && !isOnEnd) return false;
         if (filterEmployee && ev.employee !== filterEmployee) return false;
-        if (filterRoom && ev.room !== filterRoom) return false;
+        if (_isRoomFiltered(ev.room)) return false;
         return true;
     });
     const timeGroup = {};
@@ -2276,7 +2377,7 @@ function getFilterEvents(range){
     });
     // 套用員工/房間篩選
     if (filterEmployee) list = list.filter(ev => ev.employee === filterEmployee);
-    if (filterRoom) list = list.filter(ev => ev.room === filterRoom);
+    if (filterRooms.length) list = list.filter(ev => filterRooms.includes(ev.room));
     list.sort((a,b)=>{
         const d1 = a.date + " " + a.startTime;
         const d2 = b.date + " " + b.startTime;
@@ -2367,7 +2468,7 @@ function getFilteredTodos(range){
         list = list.filter(t => t.startDate <= we && t.endDate >= ws);
     }
     if(filterEmployee) list = list.filter(t => t.employee === filterEmployee);
-    if(filterRoom) list = list.filter(t => t.room === filterRoom);
+    if(filterRooms.length) list = list.filter(t => filterRooms.includes(t.room));
     return list;
 }
 
@@ -2579,12 +2680,12 @@ async function exportPdf(range){
                     (eventsData || []).forEach(ev => {
                         if (ev.date !== dateStr) return;
                         if (filterEmployee && ev.employee !== filterEmployee) return;
-                        if (filterRoom && ev.room !== filterRoom) return;
+                        if (_isRoomFiltered(ev.room)) return;
                         items.push({ kind: 'event', text: `${ev.startTime} ${ev.name} - ${ev.room}`, room: ev.room });
                     });
                     (todosData || []).forEach(todo => {
                         if (filterEmployee && todo.employee !== filterEmployee) return;
-                        if (filterRoom && todo.room !== filterRoom) return;
+                        if (_isRoomFiltered(todo.room)) return;
                         if (todo.startDate <= dateStr && todo.endDate >= dateStr) {
                             items.push({ kind: 'todo', text: (todo.startTime || '') + ' ' + todo.title });
                         }
@@ -2722,7 +2823,7 @@ async function exportPdf(range){
             const items = [];
             (todosData || []).forEach(todo => {
                 if (filterEmployee && todo.employee !== filterEmployee) return;
-                if (filterRoom && todo.room !== filterRoom) return;
+                if (_isRoomFiltered(todo.room)) return;
                 if (todo.startDate <= dateStr && todo.endDate >= dateStr) {
                     items.push({ _type: 'todo', name: todo.title, startTime: todo.startTime || '' });
                 }
@@ -3054,26 +3155,211 @@ function getCompactRoomText(roomName){
     return words.map(w => /^[A-Z]+$/.test(w) ? w : w.charAt(0).toUpperCase()).join('');
 }
 
-// ====== 左側邊欄：房間色塊 ======
+// ====== 左側邊欄：房間色塊（多選） ======
 function renderRoomChips() {
     const wrap = document.getElementById('roomChips');
     if (!wrap) return;
     const allRooms = [...roomList];
-    let html = `<button class="room-chip${!filterRoom ? ' active' : ''}" data-room="" style="border-left:3px solid #ccc;"><span class="chip-dot" style="background:#ccc;"></span>全部</button>`;
+    let html = `<button class="room-chip${filterRooms.length === 0 ? ' active' : ''}" data-room="" style="border-left:3px solid #ccc;"><span class="chip-dot" style="background:#ccc;"></span>全部</button>`;
     allRooms.forEach(r => {
         const style = getRoomStyle(r.name);
-        html += `<button class="room-chip${filterRoom === r.name ? ' active' : ''}" data-room="${r.name.replace(/"/g, '&quot;')}" style="border-left:3px solid ${style.border};background:${style.bg}20;">
+        const active = filterRooms.includes(r.name) ? ' active' : '';
+        html += `<button class="room-chip${active}" data-room="${r.name.replace(/"/g, '&quot;')}" style="border-left:3px solid ${style.border};background:${style.bg}20;">
             <span class="chip-dot" style="background:${style.border};"></span>${r.name}</button>`;
     });
     wrap.innerHTML = html;
     wrap.querySelectorAll('.room-chip').forEach(el => {
         el.onclick = () => {
             const room = el.dataset.room || '';
-            filterRoom = room;
+            if (room === '') {
+                filterRooms = [];
+            } else if (filterRooms.includes(room)) {
+                filterRooms = filterRooms.filter(v => v !== room);
+            } else {
+                filterRooms.push(room);
+            }
             renderRoomChips();
+            _refreshRoomMultiFilter();
             updateView();
         };
     });
+    // 色塊點擊：開啟房間顏色選擇器（不觸發篩選）
+    wrap.querySelectorAll('.chip-dot').forEach(dot => {
+        dot.onclick = (e) => {
+            e.stopPropagation();
+            const room = dot.closest('.room-chip').dataset.room;
+            if (room) showColorPicker(room);
+        };
+    });
+}
+
+// ====== 房間顏色選擇器（HSV 調色盤） ======
+function _hsvToRgb(h, s, v) {
+    s /= 100; v /= 100;
+    const c = v * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = v - c;
+    let r, g, b;
+    if (h < 60)       { r = c; g = x; b = 0; }
+    else if (h < 120) { r = x; g = c; b = 0; }
+    else if (h < 180) { r = 0; g = c; b = x; }
+    else if (h < 240) { r = 0; g = x; b = c; }
+    else if (h < 300) { r = x; g = 0; b = c; }
+    else              { r = c; g = 0; b = x; }
+    return [
+        Math.round((r + m) * 255),
+        Math.round((g + m) * 255),
+        Math.round((b + m) * 255)
+    ];
+}
+function _rgbToHex(r, g, b) {
+    return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+function _hexToHsv(hex) {
+    hex = hex.replace('#', '');
+    if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+    const r = parseInt(hex.slice(0, 2), 16) / 255;
+    const g = parseInt(hex.slice(2, 4), 16) / 255;
+    const b = parseInt(hex.slice(4, 6), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const d = max - min;
+    let h = 0, s = max === 0 ? 0 : (d / max) * 100, v = max * 100;
+    if (d !== 0) {
+        if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+        else if (max === g) h = ((b - r) / d + 2) * 60;
+        else h = ((r - g) / d + 4) * 60;
+    }
+    return [h, s, v];
+}
+
+let _pickerDragging = null;
+function showColorPicker(roomName) {
+    selectedColorRoom = roomName;
+    const modal = document.getElementById('colorPickerModal');
+    const title = document.getElementById('colorPickerTitle');
+    const gradEl = document.getElementById('pickerGradient');
+    const hueEl = document.getElementById('pickerHue');
+    const marker = document.getElementById('pickerMarker');
+    const hueMarker = document.getElementById('pickerHueMarker');
+    const previewCur = document.getElementById('pickerPreviewCur');
+    const previewNew = document.getElementById('pickerPreviewNew');
+    const hexInput = document.getElementById('pickerHexInput');
+    const swatchesEl = document.getElementById('colorSwatches');
+
+    title.textContent = `調整「${roomName}」顏色`;
+
+    const currentHex = getRoomStyle(roomName).border;
+    previewCur.style.background = currentHex;
+    let [curH, curS, curV] = _hexToHsv(currentHex);
+
+    function applyToUI() {
+        const [r, g, b] = _hsvToRgb(curH, curS, curV);
+        const hex = _rgbToHex(r, g, b);
+        gradEl.style.background = `hsl(${curH}, 100%, 50%)`;
+        previewNew.style.background = hex;
+        hexInput.value = hex.replace('#', '').toUpperCase();
+        marker.style.left = (curS) + '%';
+        marker.style.top = (100 - curV) + '%';
+        hueMarker.style.left = (curH / 360 * 100) + '%';
+        swatchesEl.querySelectorAll('.color-swatch').forEach(s => {
+            s.classList.toggle('selected', s.dataset.color.toLowerCase() === hex.toLowerCase());
+        });
+    }
+
+    gradEl.onmousedown = (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        _pickSV(e, gradEl, (x, y) => { curS = x * 100; curV = (1 - y) * 100; applyToUI(); });
+    };
+    hueEl.onmousedown = (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        _pickHue(e, hueEl, (pct) => { curH = pct * 360; applyToUI(); });
+    };
+
+    swatchesEl.innerHTML = ROOM_PALETTE.map(hex =>
+        `<div class="color-swatch${hex.toLowerCase() === currentHex.toLowerCase() ? ' selected' : ''}" data-color="${hex}" style="background:${hex};"></div>`
+    ).join('');
+    swatchesEl.querySelectorAll('.color-swatch').forEach(el => {
+        el.onclick = () => {
+            [curH, curS, curV] = _hexToHsv(el.dataset.color);
+            applyToUI();
+        };
+    });
+
+    hexInput.value = currentHex.replace('#', '').toUpperCase();
+    hexInput.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            const v = hexInput.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
+            if (v.length === 6) {
+                [curH, curS, curV] = _hexToHsv('#' + v);
+                applyToUI();
+            }
+        }
+    };
+    hexInput.onblur = () => {
+        const v = hexInput.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
+        if (v.length === 6) {
+            [curH, curS, curV] = _hexToHsv('#' + v);
+            applyToUI();
+        }
+    };
+
+    applyToUI();
+    modal.classList.add('active');
+}
+
+function _pickSV(e, el, onChange) {
+    const rect = el.getBoundingClientRect();
+    function move(ev) {
+        const cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
+        const cy = ev.touches ? ev.touches[0].clientY : ev.clientY;
+        const x = Math.max(0, Math.min(1, (cx - rect.left) / rect.width));
+        const y = Math.max(0, Math.min(1, (cy - rect.top) / rect.height));
+        onChange(x, y);
+    }
+    move(e);
+    function onMove(ev) { ev.preventDefault(); move(ev); }
+    function onUp() { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+}
+function _pickHue(e, el, onChange) {
+    const rect = el.getBoundingClientRect();
+    function move(ev) {
+        const cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
+        const x = Math.max(0, Math.min(1, (cx - rect.left) / rect.width));
+        onChange(x);
+    }
+    move(e);
+    function onMove(ev) { ev.preventDefault(); move(ev); }
+    function onUp() { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+}
+
+const colorPickerConfirm = document.getElementById('colorPickerConfirm');
+if (colorPickerConfirm) {
+    colorPickerConfirm.onclick = async () => {
+        const roomName = selectedColorRoom;
+        if (!roomName) return;
+        const hex = '#' + document.getElementById('pickerHexInput').value.replace('#', '');
+        if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+        const newColor = { bg: hex + '20', border: hex, label: hex };
+        roomColorMap[roomName] = newColor;
+        _saveUserOverride(roomName);
+        const room = roomList.find(r => r.name === roomName);
+        if (room && room.id) {
+            fetch(`${API_BASE}/rooms/${room.id}/color`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ colorData: JSON.stringify(newColor) })
+            }).catch(() => {});
+        }
+        document.getElementById('colorPickerModal').classList.remove('active');
+        renderRoomChips();
+        updateView();
+    };
 }
 
 // ====== 左側邊欄：迷你月曆 ======

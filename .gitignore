@@ -2,3 +2,5 @@ node_modules/
 .DS_Store
 *.log
 booking-server/
+~$*
+USER_MANUAL.*

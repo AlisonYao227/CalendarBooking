@@ -133,8 +133,8 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 .day:hover { background: #f0ecf8; }
 .day.today { 
   background: var(--day-today-bg); /* 今日格子底色由變數控制 */
-  font-weight: bold; 
 }
+.day.today .day-number { font-weight: bold; }
 .day.today::before { content: "TODAY"; font-size: 10px; color: #4a90e2; position: absolute; right: 5px; top: 5px; }
 
 .day-number { font-size: 1.1rem; margin-bottom: 5px; display: block; }
@@ -243,6 +243,7 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   color: #2c3e50;
   padding: 3px;
   font-size: 10px;
+  font-weight: 400;
   line-height: 1.25;
   border-radius: 3px;
   overflow: hidden;
@@ -363,6 +364,7 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 /* Event Label */
 .event-label {
   font-size: 11px;
+  font-weight: 400;
   background: var(--primary-color);
   color: white;
   padding: 2px 5px;
@@ -374,8 +376,7 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   cursor: pointer;
 }
 
-.event-label.room-vip { background: #ab47bc; }
-.event-label.room-eds { background: #7e57c2; }
+
 
 /* Modal Styles */
 .modal-overlay {
@@ -590,6 +591,56 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   .day-events { min-height: 40px; }
   .event-label { font-size: 7px !important; width: 100% !important; }
 }
+
+/* Paste bar (Outlook-style copy/paste) */
+.paste-bar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 11000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  padding: 10px 14px;
+  max-width: 92vw;
+  flex-wrap: wrap;
+}
+.paste-bar-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #333;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.paste-bar-info i { color: var(--primary-color); }
+.paste-bar input[type="date"] {
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.paste-bar-btn {
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #333;
+  padding: 6px 14px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.paste-bar-btn:hover { background: #f2f0fa; }
+.paste-bar-btn.paste-primary {
+  background: var(--primary-color);
+  color: #fff;
+  border-color: var(--primary-color);
+}
+.paste-bar-btn.paste-primary:hover { opacity: 0.9; }
 
 /* Loading spinner */
 .loading-spinner {

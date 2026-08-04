@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="style.css?v=20260803c" />
+  <link rel="stylesheet" href="style.css?v=20260805a" />
   <title>大月曆預約系統</title>
 </head>
 <body>
@@ -263,6 +263,9 @@
       <div class="header-actions">
     <button id="btnDeleteDetail" title="Delete">
         <i class="fa-regular fa-trash-can"></i>
+    </button>
+    <button id="btnCopyDetail" title="複製預約（Ctrl+C）">
+        <i class="fa-regular fa-copy"></i>
     </button>
     <button id="btnEditDetail" title="Edit">
         <i class="fa-solid fa-pencil"></i>
@@ -617,13 +620,24 @@
     </div>
   </div>
 
+  <!-- 貼上預約浮動列（Outlook 式複製/貼上） -->
+  <div id="pasteBar" class="paste-bar" style="display:none;">
+    <div class="paste-bar-info">
+      <i class="fa-regular fa-copy"></i>
+      <span id="pasteBarText">已複製預約</span>
+    </div>
+    <input type="date" id="pasteDateInput" title="貼上目標日期">
+    <button id="pasteApplyBtn" class="paste-bar-btn paste-primary">貼上</button>
+    <button id="pasteClearBtn" class="paste-bar-btn">清除</button>
+  </div>
+
   <!-- 載入中轉圈 -->
   <div id="loadingSpinner" class="loading-spinner" style="display:none;">
     <div class="spinner"></div>
     <div class="loading-text">載入中…</div>
   </div>
 
-  <script src="script.js?v=20260804c"></script>
+  <script src="script.js?v=20260805b"></script>
 </body>
 </html>
 

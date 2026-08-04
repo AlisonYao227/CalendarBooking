@@ -1886,7 +1886,7 @@ function openBookingForm(dateStr, index = -1) {
     document.querySelectorAll('.time-slot-btn').forEach(btn => {
         btn.onclick = () => {
             const slot = btn.dataset.slot;
-            const map = { all: ['00:00','23:30'], am: ['09:00','13:00'], pm: ['14:00','18:00'] };
+            const map = { all: ['09:00','18:00'], am: ['09:00','13:00'], pm: ['14:00','18:00'] };
             const [s, e] = map[slot] || [];
             if (s) { startTimeEl.value = s; endTimeEl.value = e; }
         };
@@ -2905,7 +2905,7 @@ function extractWeekdayIndex(str) {
 // 舊格式時段（全日/am/pm）轉開始/結束時間
 function sessionToTimes(sessionVal) {
     const v = String(sessionVal || '').trim().toLowerCase();
-    if (v === '全日' || v === '全天' || v === 'full' || v === 'allday' || v === 'all day') return { sTime: '00:00', eTime: '23:30' };
+    if (v === '全日' || v === '全天' || v === 'full' || v === 'allday' || v === 'all day') return { sTime: '09:00', eTime: '18:00' };
     if (v === 'am' || v === '上午' || v === '早上' || v === 'morning') return { sTime: '09:00', eTime: '13:00' };
     if (v === 'pm' || v === '下午' || v === 'afternoon') return { sTime: '14:00', eTime: '18:00' };
     return null;

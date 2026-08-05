@@ -166,8 +166,8 @@
     <button id="settingBtn" class="setting-btn" title="系統設定">
         <i class="fa-solid fa-gear"></i>
     </button>
-    <!-- 本月代辦事項按鈕 -->
-    <button id="todosBtn" class="setting-btn" title="代辦事項">
+    <!-- 本月待辦事項按鈕 -->
+    <button id="todosBtn" class="setting-btn" title="待辦事項">
         <i class="fa-solid fa-calendar-check"></i>
     </button>
   </div>
@@ -335,7 +335,7 @@
     <div class="view-detail-body">
       <div class="detail-color-bar" style="background:#f9a825;"></div>
       <div class="detail-info">
-        <h2 id="todoDetailTitle">代辦事項</h2>
+        <h2 id="todoDetailTitle">待辦事項</h2>
         <p id="todoDetailDate">日期</p>
         <p id="todoDetailTime">時間</p>
         <p id="todoDetailRoom" class="detail-room-tag">房間</p>
@@ -503,24 +503,24 @@
     </div>
   </div>
 </div>
-  <!-- 代辦事項彈窗 -->
+  <!-- 待辦事項彈窗 -->
   <div class="modal-overlay" id="todosModal">
     <div class="add-event-wrapper" style="width:560px;max-width:90vw;">
       <div class="modal-header">
-        <h3>代辦事項</h3>
+        <h3>待辦事項</h3>
         <div class="header-right">
           <button class="btn-close-view"><i class="fa-solid fa-xmark"></i></button>
         </div>
       </div>
       <div class="add-event-body">
         <div class="todo-tabs" style="display:flex;gap:0;margin-bottom:12px;border-bottom:2px solid #eee;">
-          <button class="todo-tab active" data-tab="todos" style="flex:1;padding:8px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;color:var(--primary-color);border-bottom:2px solid var(--primary-color);margin-bottom:-2px;">代辦事項</button>
+          <button class="todo-tab active" data-tab="todos" style="flex:1;padding:8px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;color:var(--primary-color);border-bottom:2px solid var(--primary-color);margin-bottom:-2px;">待辦事項</button>
           <button class="todo-tab" data-tab="leaves" style="flex:1;padding:8px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;color:#888;border-bottom:2px solid transparent;margin-bottom:-2px;">員工假期</button>
         </div>
-        <!-- 代辦事項 Tab -->
+        <!-- 待辦事項 Tab -->
         <div id="tabTodos">
         <div class="input-group">
-          <label>代辦事項名稱</label>
+          <label>待辦事項名稱</label>
           <input type="text" id="todoTitle" placeholder="例如：佈置房間">
         </div>
         <div class="input-row">
@@ -596,7 +596,7 @@
             <label style="cursor:pointer;font-size:13px;"><input type="checkbox" class="todo-dow" value="0"> 週日</label>
           </div>
         </div>
-        <button id="addTodoBtn" class="btn-add-main" style="width:100%;margin-bottom:12px;">新增代辦事項</button>
+        <button id="addTodoBtn" class="btn-add-main" style="width:100%;margin-bottom:12px;">新增待辦事項</button>
         <div id="todoListWrap" style="max-height:300px;overflow-y:auto;"></div>
         </div>
         <!-- 員工假期 Tab -->
@@ -682,7 +682,7 @@
     <div class="loading-text">載入中…</div>
   </div>
 
-  <script src="script.js?v=20260807b"></script>
+  <script src="script.js?v=20260807c"></script>
 </body>
 </html>
 

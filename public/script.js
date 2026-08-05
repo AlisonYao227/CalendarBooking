@@ -3490,7 +3490,7 @@ async function loadTodos() {
         const res = await fetch(`${API_BASE}/todos`);
         const json = await res.json();
         if (json.ok) todosData = json.data;
-    } catch (err) { console.error("載入代辦事項失敗:", err); }
+    } catch (err) { console.error("載入待辦事項失敗:", err); }
 }
 
 async function loadHolidays(year) {
@@ -3530,7 +3530,7 @@ function renderTodos() {
     if (!wrap) return;
     wrap.innerHTML = '';
     if (todosData.length === 0) {
-        wrap.innerHTML = '<div style="color:#888;text-align:center;padding:12px;">暫無代辦事項</div>';
+        wrap.innerHTML = '<div style="color:#888;text-align:center;padding:12px;">暫無待辦事項</div>';
         return;
     }
     // Group by title+startTime+endTime+room+employee+isAllDay
@@ -3579,7 +3579,7 @@ async function deleteTodoGroupByKey(idx) {
     if (!todos || !todos.length) return;
     if (!clickGuardKey('delTodo_' + key)) return;
     const todo = todos[0];
-    if (!confirm(`確定刪除此批「${todo.title}」所有 ${todos.length} 條代辦事項？`)) return;
+    if (!confirm(`確定刪除此批「${todo.title}」所有 ${todos.length} 條待辦事項？`)) return;
     try {
         const ids = todos.map(t => t.id);
         await fetch(`${API_BASE}/todos/batch-delete-by-ids`, {
@@ -3608,7 +3608,7 @@ function showTodoDetail(todo) {
     const delBtn = document.getElementById('btnDeleteTodoDetail');
     delBtn.onclick = async () => {
         if (!clickGuard(delBtn)) return;
-        if (!confirm('確定刪除此代辦事項？')) return;
+        if (!confirm('確定刪除此待辦事項？')) return;
         await fetch(`${API_BASE}/todos/${todo.id}`, { method: 'DELETE' });
         modal.classList.remove("active");
         await loadTodos(); renderTodos(); updateView();
@@ -3636,7 +3636,7 @@ function editTodoItem(todo) {
         document.getElementById('todoAllDay').checked = todo.isAllDay;
         document.getElementById('todosModal').classList.add("active");
         const addBtn = document.getElementById('addTodoBtn');
-        addBtn.textContent = '更新代辦事項';
+        addBtn.textContent = '更新待辦事項';
         addBtn.dataset.editId = todo.id;
     } catch (err) {
         console.error('editTodoItem error:', err);

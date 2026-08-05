@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="style.css?v=20260807d" />
+  <link rel="stylesheet" href="style.css?v=20260807e" />
   <title>大月曆預約系統</title>
 </head>
 <body>
@@ -582,18 +582,18 @@
           </div>
         </div>
         <div class="input-group">
-          <label style="cursor:pointer;"><input type="checkbox" id="todoAllDay" style="margin-right:6px;"> 全日（不指定時間）</label>
+          <label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;">全日<input type="checkbox" id="todoAllDay"></label>
         </div>
         <div class="input-group">
-          <label>重複（可多選，於日期範圍內重複建立）</label>
+          <label>重複（可多選）</label>
           <div id="todoWeekdays" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">
-            <label style="cursor:pointer;font-size:13px;"><input type="checkbox" class="todo-dow" value="1"> 週一</label>
-            <label style="cursor:pointer;font-size:13px;"><input type="checkbox" class="todo-dow" value="2"> 週二</label>
-            <label style="cursor:pointer;font-size:13px;"><input type="checkbox" class="todo-dow" value="3"> 週三</label>
-            <label style="cursor:pointer;font-size:13px;"><input type="checkbox" class="todo-dow" value="4"> 週四</label>
-            <label style="cursor:pointer;font-size:13px;"><input type="checkbox" class="todo-dow" value="5"> 週五</label>
-            <label style="cursor:pointer;font-size:13px;"><input type="checkbox" class="todo-dow" value="6"> 週六</label>
-            <label style="cursor:pointer;font-size:13px;"><input type="checkbox" class="todo-dow" value="0"> 週日</label>
+            <label style="cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:5px;">週一<input type="checkbox" class="todo-dow" value="1"></label>
+            <label style="cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:5px;">週二<input type="checkbox" class="todo-dow" value="2"></label>
+            <label style="cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:5px;">週三<input type="checkbox" class="todo-dow" value="3"></label>
+            <label style="cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:5px;">週四<input type="checkbox" class="todo-dow" value="4"></label>
+            <label style="cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:5px;">週五<input type="checkbox" class="todo-dow" value="5"></label>
+            <label style="cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:5px;">週六<input type="checkbox" class="todo-dow" value="6"></label>
+            <label style="cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:5px;">週日<input type="checkbox" class="todo-dow" value="0"></label>
           </div>
         </div>
         <button id="addTodoBtn" class="btn-add-main" style="width:100%;margin-bottom:12px;">新增待辦事項</button>

@@ -450,16 +450,6 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 .input-group { margin-bottom: 15px; }
 .input-group label { display: block; margin-bottom: 5px; font-size: 14px; }
 .input-group input, .input-group select { width: 100%; padding: 8px; box-sizing: border-box; }
-/* 待辦事項「全日」與週一至週日 checkbox：修復 Windows 上方格與文字錯位（垂直置中） */
-.input-group label:has(> #todoAllDay),
-#todoWeekdays label {
-  display: inline-flex;
-  align-items: center;
-}
-#todoAllDay, .todo-dow {
-  vertical-align: middle;
-  flex-shrink: 0;
-}
 .input-row { display: flex; gap: 10px; }
 
 /* 右上角設置按鈕 */

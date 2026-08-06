@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="style.css?v=20260807e" />
+  <link rel="stylesheet" href="style.css?v=20260808d" />
   <title>大月曆預約系統</title>
 </head>
 <body>
@@ -142,7 +142,12 @@
       </div>
     </div>
 
-    
+    <!-- 活動名稱搜尋 -->
+    <div class="activity-search-wrap">
+      <input type="text" id="activitySearchInput" class="activity-search-input" placeholder="搜尋活動名稱…" title="輸入活動名稱（可多關鍵字，空白分隔）">
+      <button type="button" id="activitySearchBtn" class="activity-search-btn" title="搜尋活動並統計"><i class="fa-solid fa-magnifying-glass"></i></button>
+    </div>
+
     <!-- 匯入Excel 按鈕+資訊提示 -->
     <div style="position:relative;display:inline-block;">
       <button id="importBtn" class="setting-btn" title="匯入Excel預約">
@@ -665,6 +670,52 @@
     </div>
   </div>
 
+  <!-- 活動名稱搜尋結果彈窗 -->
+  <div class="modal-overlay" id="activitySearchModal">
+    <div class="add-event-wrapper" style="width:760px;max-width:94vw;">
+      <div class="modal-header">
+        <h3>活動名稱搜尋統計</h3>
+        <div class="header-right">
+          <button class="btn-close-view"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+      <div class="add-event-body">
+        <div class="act-search-controls">
+          <div class="input-group" style="flex:1;margin-bottom:0;">
+            <label>活動名稱關鍵字</label>
+            <input type="text" id="activitySearchKeyword" placeholder="例如：會議　或　年度 檢討（空白分隔多關鍵字）">
+          </div>
+          <div class="input-group" style="width:120px;margin-bottom:0;">
+            <label>時間範圍</label>
+            <select id="activitySearchRange">
+              <option value="thisYear">今年</option>
+              <option value="last12months">近12個月</option>
+              <option value="all">全部</option>
+              <option value="custom">自訂</option>
+            </select>
+          </div>
+          <div class="act-search-custom-range" id="activitySearchCustomRange" style="display:none;">
+            <div class="input-group" style="margin-bottom:0;">
+              <label>開始日期</label>
+              <input type="date" id="activitySearchCustomStart">
+            </div>
+            <span class="act-search-custom-tilde">~</span>
+            <div class="input-group" style="margin-bottom:0;">
+              <label>結束日期</label>
+              <input type="date" id="activitySearchCustomEnd">
+            </div>
+          </div>
+          <button id="activitySearchRunBtn" class="btn-add-main act-search-run-btn">搜尋</button>
+        </div>
+        <div id="activitySearchSummary" class="act-search-summary"></div>
+        <div class="act-search-section-title">依名稱統計（點擊名稱過濾下方明細）</div>
+        <div id="activitySearchGroupsWrap" class="act-search-groups"></div>
+        <div class="act-search-section-title">明細（點擊列跳轉到該日期）</div>
+        <div id="activitySearchDetailWrap" class="act-search-detail"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- 貼上預約浮動列（Outlook 式複製/貼上） -->
   <div id="pasteBar" class="paste-bar" style="display:none;">
     <div class="paste-bar-info">
@@ -682,7 +733,7 @@
     <div class="loading-text">載入中…</div>
   </div>
 
-  <script src="script.js?v=20260807c"></script>
+  <script src="script.js?v=20260808d"></script>
 </body>
 </html>
 

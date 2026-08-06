@@ -28,7 +28,7 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
   display: flex;
   align-items: center;
   gap: 10px;
-  max-width: 1000px;
+  max-width: 1152px;
   margin: 0 auto;
 }
 #prevbtn, #nextbtn {
@@ -1038,3 +1038,287 @@ body { font-family: sans-serif; background: var(--bg-color); margin: 0; padding:
 .mini-cal-day.selected { background: var(--primary-color); color: #fff; font-weight: 600; }
 .mini-cal-day.other-month { color: #ccc; }
 .mini-cal-day.empty { cursor: default; }
+
+/* ========== 活動名稱搜尋統計 ========== */
+.activity-search-wrap {
+  position: relative;
+  display: inline-block;
+}
+.activity-search-input {
+  width: 180px;
+  padding: 7px 32px 7px 10px;
+  border-radius: 5px;
+  border: 1px solid var(--border-color);
+  font-size: 13px;
+  background: white;
+  box-sizing: border-box;
+}
+.activity-search-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+.activity-search-btn {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 30px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #666;
+  font-size: 13px;
+  border-radius: 0 5px 5px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.activity-search-btn:hover { color: var(--primary-color); }
+
+.act-search-controls {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.act-search-run-btn { padding: 8px 18px; flex: 0 0 auto; }
+.act-search-custom-range {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+.act-search-custom-range .input-group { width: 140px; }
+.act-search-custom-tilde {
+  padding-bottom: 8px;
+  color: #888;
+}
+.act-search-summary {
+  margin: 12px 0 4px;
+  padding: 10px 12px;
+  background: #f6f3ff;
+  border: 1px solid #e6defa;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #333;
+}
+.act-search-summary strong { color: var(--primary-color); }
+.act-search-section-title {
+  margin: 12px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+}
+.act-search-groups {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+.act-search-detail {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+.act-search-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.act-search-table th {
+  position: sticky;
+  top: 0;
+  background: #ece5f5;
+  color: #4a3a6b;
+  text-align: left;
+  padding: 7px 10px;
+  font-weight: 600;
+  z-index: 1;
+}
+.act-search-table td {
+  padding: 6px 10px;
+  border-top: 1px solid #f0f0f0;
+  white-space: nowrap;
+}
+.act-search-table tr { cursor: pointer; }
+.act-search-table tbody tr:hover { background: #f0f6ff; }
+.act-search-table tbody tr.active-row { background: #e6efff; }
+.act-group-count {
+  display: inline-block;
+  min-width: 22px;
+  text-align: center;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--primary-color);
+  color: #fff;
+  font-size: 11px;
+}
+.act-group-bar-wrap { width: 100px; }
+.act-group-bar {
+  height: 10px;
+  background: #d8cdf0;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.act-group-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--primary-color);
+  border-radius: 5px;
+}
+.act-search-empty {
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+}
+
+/* ========== 響應式：手機 / 平板（<900px） ========== */
+.day-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  justify-content: center;
+  margin-top: 4px;
+}
+.day-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.day-dot-more {
+  font-size: 9px;
+  color: #888;
+  line-height: 8px;
+}
+
+@media (max-width: 900px) and (pointer: coarse) {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  body {
+    overflow-x: hidden;
+  }
+
+  /* 頂部工具列：換行 + 加大觸控目標 */
+  .calendar-header {
+    padding: 8px;
+  }
+  .month-nav {
+    flex-wrap: wrap;
+    max-width: 100%;
+    row-gap: 8px;
+  }
+  #monthYear {
+    flex: 1 1 100%;
+    order: -1;
+    font-size: 18px;
+  }
+  #prevbtn,
+  #nextbtn {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
+  .this-month-btn {
+    height: 44px;
+    padding: 0 16px;
+    font-size: 14px;
+  }
+  .setting-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 17px;
+  }
+  .view-select,
+  .filter-select {
+    min-height: 44px;
+    font-size: 14px;
+  }
+  .activity-search-wrap {
+    flex: 1 1 100%;
+    order: 10;
+  }
+  .activity-search-input {
+    width: 100%;
+    min-height: 44px;
+    font-size: 14px;
+  }
+  .activity-search-btn {
+    width: 44px;
+    font-size: 15px;
+  }
+
+  /* 月曆手機模式：緊湊格 + 圓點 */
+  .days {
+    grid-auto-rows: 96px;
+  }
+  .day {
+    padding: 3px;
+    overflow: hidden;
+  }
+  .day-number {
+    font-size: 1rem;
+    text-align: center;
+    margin-bottom: 2px;
+  }
+  .day.today::before {
+    content: none;
+  }
+  .day.holiday .holiday-tag {
+    font-size: 8px;
+    display: block;
+    text-align: center;
+  }
+  .event-label {
+    display: none;
+  }
+
+  /* 週/日視圖：禁止頁面橫向跑版 */
+  .timeline-container {
+    min-height: 0;
+    max-height: 82vh;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 彈窗：滿版化 */
+  .add-event-wrapper {
+    width: 96vw !important;
+    max-width: 96vw !important;
+    padding: 14px;
+  }
+  .input-row {
+    flex-wrap: wrap;
+  }
+  .input-row > .input-group {
+    flex: 1 1 100%;
+  }
+  .act-search-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .act-search-custom-range {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .act-search-custom-range .input-group {
+    width: 100%;
+  }
+  .act-search-custom-tilde {
+    display: none;
+  }
+  .act-search-summary {
+    font-size: 13px;
+  }
+  .act-search-table {
+    font-size: 11px;
+  }
+  .act-search-table th,
+  .act-search-table td {
+    padding: 5px 6px;
+  }
+}

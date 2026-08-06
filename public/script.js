@@ -1,5 +1,8 @@
 // --- 元素選取與初始化保持不變 ---
 const API_BASE = "/api";
+// 手機模式：僅在「寬度 <900px 且主要輸入為觸控」時啟用，Mac/Windows 桌面（滑鼠/觸控板）一律維持原樣
+const MOBILE_MODE_MQ = '(max-width: 900px) and (pointer: coarse)';
+function isMobileMode() { return window.matchMedia(MOBILE_MODE_MQ).matches; }
 async function createReservation(data) {
   const res = await fetch(`${API_BASE}/reservations`, {
     method: "POST",
@@ -324,6 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.__CAL_BOOKING_INIT_DONE__ = true;
     console.log('[IMPORT] script version v20260731c (importArmed gate)');
     loadAllData();
+    initSidebarToggle();
     renderAnnouncement();
     initFilterDropdowns();
     // 頁面一載入直接隱藏「當日」選項
@@ -1477,7 +1481,239 @@ document.querySelectorAll('.short-input').forEach(input=>{
             }
         };
     }
+
+    // === 活動名稱搜尋統計（獨立於日曆渲染，避免污染既有渲染流程） ===
+    const activitySearchInput = document.getElementById('activitySearchInput');
+    const activitySearchBtn = document.getElementById('activitySearchBtn');
+    const activitySearchKeyword = document.getElementById('activitySearchKeyword');
+    const activitySearchRunBtn = document.getElementById('activitySearchRunBtn');
+    const activitySearchModal = document.getElementById('activitySearchModal');
+    const activitySearchRange = document.getElementById('activitySearchRange');
+
+    const openActivitySearch = () => {
+        if (activitySearchKeyword && activitySearchInput) {
+            activitySearchKeyword.value = activitySearchInput.value;
+        }
+        if (activitySearchModal) activitySearchModal.classList.add('active');
+        runActivitySearch();
+    };
+
+    if (activitySearchBtn) {
+        activitySearchBtn.onclick = (e) => {
+            e.preventDefault();
+            openActivitySearch();
+        };
+    }
+    if (activitySearchInput) {
+        activitySearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                openActivitySearch();
+            }
+        });
+    }
+    if (activitySearchRunBtn) {
+        activitySearchRunBtn.onclick = () => {
+            if (activitySearchKeyword && activitySearchInput) {
+                activitySearchInput.value = activitySearchKeyword.value;
+            }
+            runActivitySearch();
+        };
+    }
+    if (activitySearchRange) {
+        const activitySearchCustomRange = document.getElementById('activitySearchCustomRange');
+        const toggleCustomRange = () => {
+            if (!activitySearchCustomRange) return;
+            activitySearchCustomRange.style.display = activitySearchRange.value === 'custom' ? 'flex' : 'none';
+        };
+        toggleCustomRange();
+        activitySearchRange.onchange = () => {
+            toggleCustomRange();
+            runActivitySearch();
+        };
+    }
 });
+
+// ====== 活動名稱搜尋統計（純函數，完全不碰日曆渲染） ======
+function normalizeSearchText(s) {
+    return String(s || '').trim().toLowerCase().replace(/\s+/g, '');
+}
+
+function getActivitySearchRangeBoundary(range) {
+    const now = new Date();
+    if (range === 'last12months') {
+        const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        return { start: getFormattedDate(start), end: getFormattedDate(end) };
+    }
+    if (range === 'thisYear') {
+        return { start: now.getFullYear() + '-01-01', end: now.getFullYear() + '-12-31' };
+    }
+    if (range === 'custom') {
+        const sEl = document.getElementById('activitySearchCustomStart');
+        const eEl = document.getElementById('activitySearchCustomEnd');
+        const start = (sEl && sEl.value) || '';
+        const end = (eEl && eEl.value) || '';
+        const invalid = !start || !end;
+        let swapped = false;
+        if (!invalid && start > end) { swapped = true; }
+        return { start: start || null, end: end || null, invalid, swapped };
+    }
+    return { start: null, end: null };
+}
+
+function filterActivitiesByKeyword(keyword) {
+    const kws = String(keyword || '').trim().split(/\s+/).filter(Boolean).map(normalizeSearchText);
+    if (!kws.length) return [];
+    const rangeEl = document.getElementById('activitySearchRange');
+    const boundary = getActivitySearchRangeBoundary(rangeEl ? rangeEl.value : 'thisYear');
+    if (boundary.invalid) return [];
+    const { start, end } = boundary;
+    return eventsData.filter(ev => {
+        if (!ev || !ev.name) return false;
+        if (start && (ev.date < start || ev.date > end)) return false;
+        const hay = normalizeSearchText(ev.name);
+        return kws.every(k => hay.includes(k));
+    });
+}
+
+function groupActivitiesByTitle(list) {
+    const groups = new Map();
+    list.forEach(ev => {
+        const name = String(ev.name || '').trim() || '(未命名)';
+        if (!groups.has(name)) groups.set(name, []);
+        groups.get(name).push(ev);
+    });
+    return Array.from(groups.entries())
+        .map(([name, items]) => ({ name, items }))
+        .sort((a, b) => b.items.length - a.items.length);
+}
+
+function getActivitySearchRangeLabel(range) {
+    const map = { thisYear: '今年', last12months: '近12個月', all: '全部' };
+    if (range === 'custom') {
+        const sEl = document.getElementById('activitySearchCustomStart');
+        const eEl = document.getElementById('activitySearchCustomEnd');
+        const s = (sEl && sEl.value) || '未選';
+        const e = (eEl && eEl.value) || '未選';
+        return `自訂 ${s} ~ ${e}`;
+    }
+    return map[range] || '今年';
+}
+
+function renderActivitySearchGroups(groups) {
+    const wrap = document.getElementById('activitySearchGroupsWrap');
+    if (!wrap) return;
+    if (!groups.length) {
+        wrap.innerHTML = '<div class="act-search-empty">沒有符合的活動</div>';
+        return;
+    }
+    const max = groups[0].items.length;
+    const total = groups.reduce((acc, g) => acc + g.items.length, 0);
+    const allRow = `<tr data-group="__ALL__" class="active-row"><td><span class="act-group-count">${total}</span></td><td>全部</td><td></td></tr>`;
+    const rows = groups.map(g => {
+        const pct = max ? Math.round((g.items.length / max) * 100) : 0;
+        return `<tr data-group="${escapeHtml(g.name)}">
+            <td><span class="act-group-count">${g.items.length}</span></td>
+            <td>${escapeHtml(g.name)}</td>
+            <td><div class="act-group-bar-wrap"><div class="act-group-bar"><span style="width:${pct}%"></span></div></div></td>
+        </tr>`;
+    }).join('');
+    wrap.innerHTML = `<table class="act-search-table"><thead><tr><th style="width:56px;">筆數</th><th>活動名稱</th><th style="width:120px;">佔比</th></tr></thead><tbody>${allRow}${rows}</tbody></table>`;
+
+    wrap.querySelectorAll('tbody tr').forEach(tr => {
+        tr.addEventListener('click', () => {
+            wrap.querySelectorAll('tbody tr').forEach(r => r.classList.remove('active-row'));
+            tr.classList.add('active-row');
+            const name = tr.dataset.group;
+            const list = name === '__ALL__'
+                ? groups.reduce((acc, g) => acc.concat(g.items), [])
+                : (groups.find(g => g.name === name) || { items: [] }).items;
+            renderActivitySearchDetails(list);
+        });
+    });
+}
+
+function renderActivitySearchDetails(list) {
+    const wrap = document.getElementById('activitySearchDetailWrap');
+    if (!wrap) return;
+    if (!list.length) {
+        wrap.innerHTML = '<div class="act-search-empty">沒有符合的活動</div>';
+        return;
+    }
+    const rows = list.slice().sort((a, b) => (a.date + ' ' + a.startTime).localeCompare(b.date + ' ' + b.startTime)).map(ev => {
+        const timeStr = (ev.startTime || ev.endTime) ? `${ev.startTime || ''}-${ev.endTime || ''}` : '';
+        return `<tr data-date="${ev.date}">
+            <td>${ev.date}</td>
+            <td>${escapeHtml(ev.name)}</td>
+            <td>${escapeHtml(ev.employee || '')}</td>
+            <td>${escapeHtml(ev.room || '')}</td>
+            <td>${timeStr}</td>
+            <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(ev.note || '')}">${escapeHtml(ev.note || '')}</td>
+        </tr>`;
+    }).join('');
+    wrap.innerHTML = `<table class="act-search-table"><thead><tr><th>日期</th><th>活動名稱</th><th>員工</th><th>房間</th><th>時間</th><th>備註</th></tr></thead><tbody>${rows}</tbody></table>`;
+
+    wrap.querySelectorAll('tbody tr').forEach(tr => {
+        tr.addEventListener('click', () => {
+            const dateStr = tr.dataset.date;
+            const modal = document.getElementById('activitySearchModal');
+            if (modal) modal.classList.remove('active');
+            const parts = String(dateStr).split('-').map(Number);
+            selectedCalendarDate = new Date(parts[0], parts[1] - 1, parts[2]);
+            updateView();
+        });
+    });
+}
+
+function runActivitySearch() {
+    const keywordEl = document.getElementById('activitySearchKeyword');
+    const rangeEl = document.getElementById('activitySearchRange');
+    if (!keywordEl) return;
+    const keyword = keywordEl.value;
+    const range = rangeEl ? rangeEl.value : 'thisYear';
+
+    const summaryEl = document.getElementById('activitySearchSummary');
+    if (range === 'custom') {
+        const boundary = getActivitySearchRangeBoundary('custom');
+        if (boundary.invalid) {
+            if (summaryEl) summaryEl.innerHTML = '請先選擇開始與結束日期再搜尋';
+            renderActivitySearchGroups([]);
+            renderActivitySearchDetails([]);
+            return;
+        }
+        if (boundary.swapped && summaryEl) {
+            summaryEl.innerHTML = `<div style="color:#c0392b;">結束日期不能早於開始日期</div>`;
+            renderActivitySearchGroups([]);
+            renderActivitySearchDetails([]);
+            return;
+        }
+    }
+
+    const list = filterActivitiesByKeyword(keyword);
+    const groups = groupActivitiesByTitle(list);
+    const allItems = groups.reduce((acc, g) => acc.concat(g.items), []);
+
+    if (summaryEl) {
+        if (!keyword.trim()) {
+            summaryEl.innerHTML = '請輸入活動名稱關鍵字再搜尋';
+        } else {
+            summaryEl.innerHTML = `「<strong>${escapeHtml(keyword.trim())}</strong>」在 <strong>${getActivitySearchRangeLabel(range)}</strong> 共命中 <strong>${list.length}</strong> 筆預約、<strong>${groups.length}</strong> 種名稱組合`;
+        }
+    }
+
+    renderActivitySearchGroups(keyword.trim() ? groups : []);
+    renderActivitySearchDetails(keyword.trim() ? allItems : []);
+}
+
+// ====== HTML 跳脫（避免名稱內含特殊字元破壞結構） ======
+function escapeHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
 
 function populateTodoDropdowns() {
     const todoRoom = document.getElementById('todoRoom');
@@ -1592,6 +1828,7 @@ function renderMonthView() {
     monthYear.innerText = `${months[month]} ${year}`;
     const firstDay = new Date(year, month, 1).getDay();
     const lastDate = new Date(year, month + 1, 0).getDate();
+    const isMobile = isMobileMode();
 
     let html = '';
     for (let i = 0; i < firstDay; i++) html += '<div class="empty"></div>';
@@ -1611,6 +1848,8 @@ function renderMonthView() {
 
         html += `<div class="${dayClasses.join(' ')}" data-date="${dateStr}">${dayInner}`;
 
+        const dots = [];
+
         // reservations
         eventsData.forEach((ev, index) => {
             const evEndDate = ev.endDate || ev.date;
@@ -1619,6 +1858,10 @@ function renderMonthView() {
             if (!isOnStartDate && !isOnEndDate) return;
             if (filterEmployee && ev.employee !== filterEmployee) return;
             if (_isRoomFiltered(ev.room)) return;
+            if (isMobile) {
+                dots.push({ color: getRoomStyle(ev.room).label, title: ev.name });
+                return;
+            }
             const style = getRoomStyle(ev.room);
             const dispRoom = getCompactRoomText(ev.room);
             const prefix = isOnEndDate ? '[跨日] ' : '';
@@ -1630,6 +1873,10 @@ function renderMonthView() {
             if (todo.startDate <= dateStr && todo.endDate >= dateStr) {
                 if (filterEmployee && todo.employee !== filterEmployee) return;
                 if (_isRoomFiltered(todo.room)) return;
+                if (isMobile) {
+                    dots.push({ color: '#f9a825', title: todo.title });
+                    return;
+                }
                 let timeStr = todo.isAllDay ? '' : (todo.startTime || '');
                 if (timeStr && todo.endTime) timeStr += '-' + todo.endTime;
                 let dispRoom = todo.room ? getCompactRoomText(todo.room) : '';
@@ -1642,11 +1889,23 @@ function renderMonthView() {
         const dayLeaves = getLeavesForDate(dateStr);
         dayLeaves.forEach(leave => {
             if (filterEmployee && leave.employee !== filterEmployee) return;
+            if (isMobile) {
+                dots.push({ color: '#4caf50', title: leave.employee + (leave.leaveType ? ' (' + leave.leaveType + ')' : '') });
+                return;
+            }
             const leaveTypeStr = leave.leaveType ? ` (${leave.leaveType})` : '';
             const isStart = leave.leaveDate === dateStr;
             const prefix = isStart ? '' : '[跨日] ';
             html += `<div class="event-label leave-label" data-leave-employee="${leave.employee}" data-leave-date="${leave.leaveDate}" style="background-color:#e8f5e9;color:#2e7d32;font-size:11px;line-height:1.3;padding:2px 4px;border-radius:3px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;width:100%;box-sizing:border-box;cursor:pointer;border-left:3px solid #4caf50;"><span class="leave-square"></span>${prefix}${leave.employee}${leaveTypeStr}</div>`;
         });
+
+        if (isMobile && dots.length) {
+            const MAX_DOTS = 14;
+            const shown = dots.slice(0, MAX_DOTS);
+            const dotHtml = shown.map(d => `<span class="day-dot" style="background:${d.color};" title="${escapeHtml(d.title)}"></span>`).join('');
+            const moreHtml = dots.length > MAX_DOTS ? `<span class="day-dot-more">+${dots.length - MAX_DOTS}</span>` : '';
+            html += `<div class="day-dots">${dotHtml}${moreHtml}</div>`;
+        }
 
         html += '</div>';
     }
@@ -1661,7 +1920,12 @@ function renderMonthView() {
             selectedCalendarDate = new Date(dateStr);
             const pasteDateInput = document.getElementById('pasteDateInput');
             if (pasteDateInput && copiedEvent) pasteDateInput.value = dateStr;
-            openBookingForm(dateStr);
+            if (isMobileMode()) {
+                viewSelect.value = 'day';
+                updateView();
+            } else {
+                openBookingForm(dateStr);
+            }
         };
     });
     calendarDays.querySelectorAll('.event-label:not(.todo-label):not(.leave-label)').forEach(evEl => {
@@ -3784,17 +4048,40 @@ function showLeaveDetail(leave) {
 }
 
 // ====== 側欄收合 ======
-function initSidebarToggle() {
+ function initSidebarToggle() {
     const toggle = document.getElementById('sidebarToggle');
     const layout = document.querySelector('.main-layout');
     if (!toggle || !layout) return;
+    if (toggle.dataset.sidebarInit) return;
+    toggle.dataset.sidebarInit = '1';
     const STORAGE_KEY = 'sidebarCollapsed';
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === '1') {
-        layout.classList.add('collapsed');
-        toggle.textContent = '▶';
-        toggle.title = '展開側欄';
+    const mq = window.matchMedia(MOBILE_MODE_MQ);
+
+    const applyResponsiveSidebar = () => {
+        if (mq.matches) {
+            layout.classList.add('collapsed');
+            toggle.textContent = '▶';
+            toggle.title = '展開側欄';
+        } else {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved === '1') {
+                layout.classList.add('collapsed');
+                toggle.textContent = '▶';
+                toggle.title = '展開側欄';
+            } else {
+                layout.classList.remove('collapsed');
+                toggle.textContent = '◀';
+                toggle.title = '收合側欄';
+            }
+        }
+        window.dispatchEvent(new Event('resize'));
+    };
+
+    applyResponsiveSidebar();
+    if (mq.addEventListener) {
+        mq.addEventListener('change', applyResponsiveSidebar);
     }
+
     toggle.onclick = () => {
         const isCollapsed = layout.classList.toggle('collapsed');
         toggle.textContent = isCollapsed ? '▶' : '◀';
